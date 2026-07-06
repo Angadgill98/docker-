@@ -42,3 +42,20 @@ async fn CreateVeth(veth_name:&String,veth_peer_name:&String,handle:&Handle)->Re
     Ok(())
 }
 
+async fn GetIndexOfinterface(interface_name:&String){
+    let mut links = handle
+    .link()
+    .get()
+    .match_name(interface_name.clone())
+    .execute();
+    links.try_next().await.unwrap()
+}
+
+async fn SetVethEndpoints(veth_index:i64,interface_index:i64){
+    handle
+    .link()
+    .set(veth_index)
+    .master(interface_index)
+    .execute()
+    .await?;
+}
