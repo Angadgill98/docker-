@@ -1,3 +1,5 @@
+use std::{fs::File, mem, os::fd::AsRawFd};
+
 use libc::{
     syscall,
     SYS_clone3,
@@ -7,18 +9,6 @@ use libc::{
     CLONE_NEWNS
 };
 
-use std::{default, fs::File, mem, os::fd::AsRawFd};
-
-mod cli;
-mod sokcet;
-mod brain;
-mod ns;
-
-fn main() {
-   
-    cli::CLI();
-    
-}
 
 #[repr(C)]
 #[derive(Default)]
@@ -37,35 +27,20 @@ struct CloneArgs {
 }
 
 
+fn Create_PID_namespace(){
 
-// fn CLI_printer(){
-//     println!("")
-// }
+}
 
+fn CreateNetNamespaceReference(){
+    let temp_pid=CreateTempProcess();
+    let temp_process_id=GetChildPID(temp_pid);
+    let net_ns_ref=GetProcNS(temp_pid);
+    if temp_pid<1{
 
-fn CreatePID_namespace(){
-    println!("Enter the name of the pid namespace:");
-    let mut input=String::new() ;
-    std::io::stdin().read_line(&mut input).unwrap();
-
-    
-    let mut args=CloneArgs::default();
-    args.flags = (
-        CLONE_NEWPID | 
-        CLONE_NEWNET | 
-        CLONE_NEWNS
-    ) as u64;
-
-    args.exit_signal=SIGCHLD as u64;
-
-    let pid =unsafe {
-        syscall(SYS_clone3,&args as *const CloneArgs,mem::size_of::<CloneArgs>())
-    };
-
-    if pid==0{
-
-    }else if pid==1 {
+    }else if temp_pid==-1 {
         
+    }else{
+
     }
 }
 
@@ -92,10 +67,30 @@ fn ChangeMountNamespce(pid:i64)-> Result<(), Box<dyn std::error::Error>>{
     Ok(())
 }
 
-fn ParentProcessCode(){
+fn CreateTempProcess()->i64{
+    let mut args=CloneArgs::default();
+    args.flags = (
+        CLONE_NEWPID | 
+        CLONE_NEWNET | 
+        CLONE_NEWNS
+    ) as u64;
 
+    args.exit_signal=SIGCHLD as u64;
+
+    let pid =unsafe {
+        syscall(SYS_clone3,&args as *const CloneArgs,mem::size_of::<CloneArgs>())
+    };
+
+    pid
 }
 
-fn ChildProcessCode(){
-
+fn GetChildPID(host_pid:i64)->i32{
+    host_pid as libc::pid_t
 }
+
+fn GetProcNS(pid:i64)->Result<File,std::io::Error>{
+    let path = format!("/proc/{}/ns/net", pid);
+    let netns = File::open(path)?;
+    Ok(netns)
+}
+
