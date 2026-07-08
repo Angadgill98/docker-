@@ -1,4 +1,4 @@
-use futures::future::ok;
+use futures::{TryStreamExt, future::ok};
 use rtnetlink::Handle;
 
 use crate::sokcet;
@@ -31,6 +31,23 @@ async fn CreateBridge(bridge_name :&String,handle:&Handle)->Result<(),Box<dyn st
 
     Ok(())
 }
+async fn AssignBridgeIP(bridge_name :&String,handle:&Handle)->Result<(),Box<dyn std::error::Error>>{
+    let index=GetIndexOfinterface(bridge_name, handle).await;
+    
+
+    handle
+    .address()
+    .add(
+        index,
+        std::net::Ipv4Addr::new(192, 168, 1, 1).into(),
+        24,
+    )
+    .execute()
+    .await?;
+
+    Ok(())
+}
+
 
 async fn CreateVeth(veth_name:&String,veth_peer_name:&String,handle:&Handle)->Result<(),Box<dyn std::error::Error>>{
     handle.link()
@@ -42,20 +59,32 @@ async fn CreateVeth(veth_name:&String,veth_peer_name:&String,handle:&Handle)->Re
     Ok(())
 }
 
-async fn GetIndexOfinterface(interface_name:&String){
+async fn GetIndexOfinterface(interface_name:&String,handle:&Handle)->u32{
     let mut links = handle
     .link()
     .get()
     .match_name(interface_name.clone())
     .execute();
-    links.try_next().await.unwrap()
+    let interface =links.try_next().await.unwrap().expect("cant find the interface name");
+    interface.header.index
+     
+
 }
 
-async fn SetVethEndpoints(veth_index:i64,interface_index:i64){
+async fn SetVethEndpoints(veth_index:u32,bridge_index:u32,handle:&Handle){
     handle
     .link()
     .set(veth_index)
-    .master(interface_index)
+    .master(bridge_index)
     .execute()
-    .await?;
+    .await.unwrap();
 }
+
+async fn MoveVethEndToCON_net_ns(container_pid:u32,veth_index:u32,handle:&Handle){
+    handle.link()
+    .set(veth_index)
+    .setns_by_pid(container_pid)
+    .execute()
+    .await.unwrap();
+}
+

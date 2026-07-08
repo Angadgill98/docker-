@@ -15,7 +15,7 @@ mod brain;
 mod ns;
 
 fn main() {
-   
+    dotenvy::dotenv().ok();
     cli::CLI();
     
 }

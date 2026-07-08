@@ -1,13 +1,16 @@
-use std::{fs::File, io::{BufRead, BufReader}};
+use std::{fs::File, io::{BufRead, BufReader, Read, Write}, net::TcpStream};
+
+use crate::sokcet;
 
 
 pub fn CLI(){
     println!("Starting with cli approach");
     let mut input:String;
+    let mut  socket=sokcet::CreateClientSocket().unwrap();
     loop {
         CLI_printer();
         input=CLI_Input();
-        
+        handleInput(&input,&mut socket);   
 
     }
 
@@ -20,7 +23,7 @@ fn CLI_printer(){
     println!("Enter a no.");
 
 
-    println!("1: Create a Container");
+    println!("1: Create a Bridge");
 
 }
 
@@ -32,17 +35,35 @@ fn CLI_Input()->String{
     input
 }
 
-fn handleInput(input:&String){
+fn handleInput(input:&String,socket:&mut TcpStream){
     match input.trim() {
         "1"=>{
-    
-
+            let op:u8=input.parse().unwrap();
+            CreateBrdige(socket,&op);
+            
         }
         _=>{
 
         }
     }
 }
+
+fn CreateBrdige(socket:&mut TcpStream,input:&u8){
+    println!("Enter bridge name:");
+    let bridge_name=CLI_Input();
+    let operation_no:u8=1;
+    let len=bridge_name.len();
+    let data=bridge_name;
+    socket.write_all(&[operation_no]);  
+    socket.write_all(&[len as u8]);
+    socket.write_all(data.as_bytes());     
+}
+
+
+
+
+
+
 
 fn Create_A_Container(input:&String){
     let mut container_name:String=String::new();
