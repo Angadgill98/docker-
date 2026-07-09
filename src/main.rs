@@ -13,10 +13,17 @@ mod cli;
 mod sokcet;
 mod brain;
 mod ns;
-
+mod container;
 fn main() {
     dotenvy::dotenv().ok();
+    let (sender,rec)=std::sync::mpsc::channel::<()>();
+    std::thread::spawn(||{
+        let _=brain::Brain_init(sender);
+        
+    });
+    rec.recv().unwrap();
     cli::CLI();
+    
     
 }
 

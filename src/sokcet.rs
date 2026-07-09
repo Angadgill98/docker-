@@ -6,7 +6,7 @@ pub fn CreateBrainSocket()-> io::Result<TcpListener> {
     let mut addr:String;    
     match env::var("BRAIN_ADD")  {
         Ok(address)=>{
-            println!("addr valueb is {address}");
+            println!("listening to addr value {address}");
             addr=address;
             TcpListener::bind(addr)
         }
@@ -20,20 +20,12 @@ pub fn CreateBrainSocket()-> io::Result<TcpListener> {
     
 }
 
-pub fn StartBrainListener(listener_socket:TcpListener)->Result<(),std::io::Error>{
-    loop{
-        let (stream,addr)=listener_socket.accept()?;
-
-    }
-
-    Ok(())
-} 
 
 pub fn CreateClientSocket()-> io::Result<TcpStream> {
     let mut addr:String; 
     match env::var("BRAIN_ADD")  {
         Ok(address)=>{
-            println!("addr valueb is {address}");
+            println!("connecting client socket to addr value  {address}");
             addr=address;
             TcpStream::connect(addr)
         }
