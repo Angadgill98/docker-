@@ -1,5 +1,7 @@
 use std::{fs::File, io::{BufRead, BufReader, Read, Write}, net::TcpStream};
 
+use serde_json::json;
+
 use crate::sokcet;
 
 
@@ -38,7 +40,7 @@ fn CLI_Input()->String{
 fn handleInput(input:&String,socket:&mut TcpStream){
     match input.trim() {
         "1"=>{
-            let op:u8=input.parse().unwrap();
+            let op:u8= input.trim().parse().unwrap();
             CreateBrdige(socket,&op);
             
         }
@@ -52,11 +54,18 @@ fn CreateBrdige(socket:&mut TcpStream,input:&u8){
     println!("Enter bridge name:");
     let bridge_name=CLI_Input();
     let operation_no:u8=1;
-    let len=bridge_name.len();
-    let data=bridge_name;
+    
+    let data = json!({
+    "name": &bridge_name.trim()
+    });
+    
+
+    let json = serde_json::to_string(&data).unwrap();
+    let len=json.len();
     socket.write_all(&[operation_no]);  
     socket.write_all(&[len as u8]);
-    socket.write_all(data.as_bytes());     
+    socket.write_all(json.as_bytes());  
+    
 }
 
 

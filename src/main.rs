@@ -17,9 +17,12 @@ mod container;
 fn main() {
     dotenvy::dotenv().ok();
     let (sender,rec)=std::sync::mpsc::channel::<()>();
-    std::thread::spawn(||{
-        let _=brain::Brain_init(sender);
-        
+    std::thread::spawn(move||{
+        let rt = tokio::runtime::Runtime::new().unwrap();
+
+        if let Err(e) = rt.block_on(brain::Brain_init(sender)) {
+            eprintln!("Brain_init failed: {e}");
+        }
     });
     rec.recv().unwrap();
     cli::CLI();

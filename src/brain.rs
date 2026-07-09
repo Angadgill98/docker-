@@ -5,37 +5,56 @@ use rtnetlink::Handle;
 use serde_json::Value;
 
 
-use crate::{container, sokcet};
+use crate::{container::{self, bridge}, sokcet};
 
 
 
 
-pub fn Brain_init(sender:std::sync::mpsc::Sender<()>)->Result<(),Box <dyn std::error::Error>>{
-    let tcp_listner= sokcet::CreateBrainSocket().unwrap();
+ pub async fn Brain_init(sender:std::sync::mpsc::Sender<()>)->Result<(),Box <dyn std::error::Error>>{
+    let tcp_listner= sokcet::CreateBrainSocket()?;
     sender.send(());
-    let mut msg=Vec::new();
+    
+    println!("STarteda the brain");
+    let (mut stream,addr)=tcp_listner.accept()?;
     loop{
-        let (mut stream,addr)=tcp_listner.accept()?;
-        loop{
-            let mut buffer=[0u8;1024];
-            let len=stream.read(&mut buffer).unwrap();
-            if len==0{
-                break;
-            }
-            msg.extend_from_slice(&buffer[..len]);
-        }
+        
+        let mut op = [0u8; 1];
+        stream.read_exact(&mut  op);
 
+        let mut len_buf = [0u8; 1];
+        stream.read_exact(&mut len_buf)?;
+        
+        let len = u8::from_be_bytes(len_buf) as usize;
+
+        let mut msg = vec![0u8; len];
+        
+        stream.read_exact(&mut msg)?;
+        
+        handle_client(&msg,op[0]).await?;
     }
     Ok(())
 }
 
-fn handle_client(msg:Vec<u8>){
-    match msg[0] {
+async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>>{
+   
+    match op {
         1=>{//Create a bridge
-            let payload=Getdata(&msg,2);
-            let data:Value=serde_json::from_slice(payload).unwrap();
+            println!("Creating a bridge");
+            
+            
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj");
             let handle=Create_RT_Netlink().unwrap();
-            container::bridge::CreateBridge(bridge_name, &handle);
+            let bridge_name=&data["name"].as_str().unwrap().to_string();
+            let insys_bridge_name=format!("dc-{}",bridge_name);
+            container::bridge::CreateBridge(&insys_bridge_name, &handle).await?;
+            println!("Bridge created");
+
+
+            println!("Storing in a file");
+            container::bridge::CreateBridgeFile()?;
+            let bridge=container::bridge::BridgeStorageStruct(&insys_bridge_name,bridge_name, &handle).await;
+            let obj=container::bridge::ReadBridgeFile()?;
+            container::bridge::WriteBridgeFile(obj, bridge)?;
         }
         2=>{//Delete a bridge
             let payload=Getdata(&msg,2);
@@ -44,9 +63,10 @@ fn handle_client(msg:Vec<u8>){
 
         }
         _=>{
-
+            println!("kn hua");
         }
     }
+    Ok(())
 
 }
 
