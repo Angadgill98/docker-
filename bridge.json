@@ -1,12 +1,11 @@
 {
-  "qweqweqweqweqw": {
-    "bridge_name": "qweqweqweqweqw",
-    "index": 15,
-    "insys": "dc-qweqweqweqweqw"
-  },
-  "vbbcbcvbvc": {
-    "bridge_name": "vbbcbcvbvc",
-    "index": 16,
-    "insys": "dc-vbbcbcvbvc"
+  "asd": {
+    "bridge_name": "asd",
+    "index": 31,
+    "status": "up",
+    "ip": "10.1.1.1",
+    "subnet": 12,
+    "network": "10.1.1.1/12",
+    "insys": "dc-asd"
   }
 }

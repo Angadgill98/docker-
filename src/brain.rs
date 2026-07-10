@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::{fs, io::Read};
 
 use futures::{TryStreamExt, future::ok, sink::Buffer};
 use rtnetlink::Handle;
@@ -49,18 +49,37 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             container::bridge::CreateBridge(&insys_bridge_name, &handle).await?;
             println!("Bridge created");
 
-
+            println!("AssignBridgeIP");
+            
+            container::bridge::AssignBridgeIP(&insys_bridge_name, &handle,&data).await.expect("failed to assing ip to teh bridge");
+           
             println!("Storing in a file");
             container::bridge::CreateBridgeFile()?;
-            let bridge=container::bridge::BridgeStorageStruct(&insys_bridge_name,bridge_name, &handle).await;
             let obj=container::bridge::ReadBridgeFile()?;
+            let bridge=container::bridge::BridgeStorageStruct(&insys_bridge_name,bridge_name, &handle,&data).await;
+            
             container::bridge::WriteBridgeFile(obj, bridge)?;
         }
         2=>{//Delete a bridge
-            let payload=Getdata(&msg,2);
-            let data:Value=serde_json::from_slice(payload).unwrap();
+            
+            
+               
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while deleting a bridge");
             let handle=Create_RT_Netlink().unwrap();
+            let bridge_name=&data["name"].as_str().unwrap().to_string();
+            let insys_bridge_name=format!("dc-{}",bridge_name);
 
+
+            container::bridge::DeleteBridge(&insys_bridge_name, &handle).await?;
+
+            container::bridge::CreateBridgeFile()?;
+
+            let mut obj=container::bridge::ReadBridgeFile()?;
+
+            obj.remove(bridge_name);
+            fs::write("bridge.json", serde_json::to_string_pretty(&obj)?)?;
+            
+            
         }
         _=>{
             println!("kn hua");
@@ -70,9 +89,6 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
 
 }
 
-fn Getdata(msg:&Vec<u8>,len:usize)->&[u8]{
-   &msg[len..]
-}
 
 
 
