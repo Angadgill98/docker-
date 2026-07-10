@@ -81,6 +81,27 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             
             
         }
+        3=>{//Create veth
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
+            let handle=Create_RT_Netlink().unwrap();
+
+            let veth_name=data["veth0_name"].as_str().unwrap().to_string();
+            let veth_peer_name=data["veth1_name"].as_str().unwrap().to_string();
+            
+            let insys_veth_name=format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string());
+            let insys_veth_peer_name=format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string());
+
+            container::veth::CreateVeth(&insys_veth_name, &insys_veth_peer_name, &handle).await.expect("not able to craete veth pair");
+
+            _=container::veth::CreateVethFile();
+
+            let obj=container::veth::ReadVethFile().unwrap();
+
+            let veth=container::veth::VethStorageStruct(&insys_veth_name,&veth_name,&handle,&data ).await;
+
+            
+
+        }
         _=>{
             println!("kn hua");
         }
@@ -104,33 +125,4 @@ fn Create_RT_Netlink()->Result<Handle,std::io::Error>{
 
 
 
-
-
-async fn CreateVeth(veth_name:&String,veth_peer_name:&String,handle:&Handle)->Result<(),Box<dyn std::error::Error>>{
-    handle.link()
-    .add()
-    .veth(veth_name.clone(), veth_peer_name.clone())
-    .execute()
-    .await?;
-
-    Ok(())
-}
-
-
-async fn SetVethEndpoints(veth_index:u32,bridge_index:u32,handle:&Handle){
-    handle
-    .link()
-    .set(veth_index)
-    .master(bridge_index)
-    .execute()
-    .await.unwrap();
-}
-
-async fn MoveVethEndToCON_net_ns(container_pid:u32,veth_index:u32,handle:&Handle){
-    handle.link()
-    .set(veth_index)
-    .setns_by_pid(container_pid)
-    .execute()
-    .await.unwrap();
-}
 

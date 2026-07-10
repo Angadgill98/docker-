@@ -183,8 +183,8 @@ fn CreateVethpair(socket:&mut TcpStream,input:&u8){
     let op=input.clone();
 
     let data=json!({
-        "veth1":veth1,
-        "veth2":veth2,
+        "veth0_name":veth1,
+        "veth1_name":veth2,
 
     });
 

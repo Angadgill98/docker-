@@ -107,21 +107,8 @@ pub async fn DeleteBridge(insys_bridge_name :&String,handle:&Handle)->Result<(),
     Ok(())
 }
 
-pub async fn DeleteBridgeFromStruct(){
 
 
-}
-
-pub async fn GetAllBridges(bridge_name :&String,handle:&Handle)->Result<(),Box<dyn std::error::Error>>{
-    let index=GetIndexOfinterface(bridge_name, handle).await;
-
-    handle.link()
-    .del(index)
-    .execute()
-    .await?;
-
-    Ok(())
-}
 
 pub async  fn AssignBridgeIP(insys_bridge_name :&String,handle:&Handle,data:&Value)->Result<(),Box<dyn std::error::Error>>{
     let index=GetIndexOfinterface(insys_bridge_name, handle).await;
