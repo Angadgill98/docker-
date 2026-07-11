@@ -126,7 +126,7 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
         }
         
         
-        5=>{//Connect veth to container or independent NET ns 
+        5=>{//Create net ns 
             
         }
         _=>{

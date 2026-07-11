@@ -15,10 +15,7 @@ struct CloneArgs {
     cgroup: u64,
 }
 
-
-
-
-fn CreatePID_namespace(){
+fn TempProcess(){
     println!("Enter the name of the pid namespace:");
     let mut input=String::new() ;
     std::io::stdin().read_line(&mut input).unwrap();
@@ -37,9 +34,17 @@ fn CreatePID_namespace(){
         syscall(SYS_clone3,&args as *const CloneArgs,mem::size_of::<CloneArgs>())
     };
 
-    if pid==0{
-
-    }else if pid==1 {
-        
+    if pid == -1 {
+        panic!("clone3 failed");
+    } else if pid == 0 {
+        // Child process
+        loop {
+            unsafe {
+                libc::p
+            }
+        }
+    } else {
+        // Parent process
+        println!("Child PID = {}", pid);
     }
 }
