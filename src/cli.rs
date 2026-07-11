@@ -30,9 +30,10 @@ fn CLI_printer(){
     println!("1: Create a Bridge");
     println!("2: Delete a Bridge");
 
+    println!("");
 
-    println!("3:Create a veth apair");
-
+    println!("3: Create a veth apair");
+    println!("4: Delete a veth");
 }
 
 fn CLI_Input()->String{
@@ -57,6 +58,10 @@ fn handleInput(input:&String,socket:&mut TcpStream){
         "3"=>{
             let op:u8= input.trim().parse().unwrap(); 
             CreateVethpair(socket, &op);
+        }
+        "4"=>{
+            let op:u8= input.trim().parse().unwrap(); 
+            delete_veth(socket, &op);
         }
         _=>{
 
@@ -183,8 +188,8 @@ fn CreateVethpair(socket:&mut TcpStream,input:&u8){
     let op=input.clone();
 
     let data=json!({
-        "veth0_name":veth1,
-        "veth1_name":veth2,
+        "veth0_name":veth1.trim(),
+        "veth1_name":veth2.trim(),
 
     });
 
@@ -195,6 +200,34 @@ fn CreateVethpair(socket:&mut TcpStream,input:&u8){
     socket.write_all(&[len as u8]);
     socket.write_all(json.as_bytes());  
 
+}
+
+fn delete_veth(socket:&mut TcpStream,input:&u8){
+    println!("Enter veth name 1:");
+    let veth1=CLI_Input();
+
+
+
+    println!("Enter veth name 2:");
+    let veth2=CLI_Input();
+
+
+    let op=input.clone();
+
+    let data=json!({
+        "veth0_name":veth1.trim(),
+        "veth1_name":veth2.trim(),
+
+    });
+    
+
+    let json = serde_json::to_string(&data).unwrap();
+    let len=json.len();
+    
+    socket.write_all(&[op]);  
+    socket.write_all(&[len as u8]);
+    socket.write_all(json.as_bytes());  
+    
 }
 
 

@@ -9,9 +9,12 @@ use serde_json::Value;
 
 #[derive(Serialize, Deserialize)]
 pub struct Veth {
-    name:Option<String>,
+   
     veth0_name:Option<String>,
     veth1_name:Option<String>,
+
+    veth0_insys_name:Option<String>,
+    veth1_insys_name:Option<String>,
     
     veth0_ip: Option<String>,
     veth1_ip: Option<String>,
@@ -47,26 +50,29 @@ pub fn CreateVethFile() -> Result<(), Box<dyn std::error::Error>> {
 
 type Veths_file=HashMap<String,Veth>;
 pub fn ReadVethFile()->Result<Veths_file,Box<dyn std::error::Error>>{
-    let paylaod=fs::read_to_string("Veth.json")?;
+    let paylaod=fs::read_to_string("veth.json")?;
     let mut obj:Veths_file=serde_json::from_str(&paylaod)?;
     Ok(obj)
 }
 
 pub fn WriteVethFile(mut obj:Veths_file,veth:Veth)->Result<(),Box<dyn std::error::Error>>{
-    // obj.insert(veth.name.unwrap().clone(), veth);
-    // fs::write("Veth.json", serde_json::to_string_pretty(&obj)?)?;
+    obj.insert(format!("{}_{}",veth.veth0_name.as_ref().unwrap(),veth.veth1_name.as_ref().unwrap()), veth);
+    fs::write("veth.json", serde_json::to_string_pretty(&obj)?)?;
     Ok(())
 }
 
-pub async fn VethStorageStruct(insys_Veth_name:&String,Veth_name :&String,handle:&Handle,obj:&Value)->Veth{
+pub async fn VethStorageStruct(insys_Veth_name:&String,insys_veth_peer_name :&String,handle:&Handle,obj:&Value)->Veth{
     let index=GetIndexOfinterface(&insys_Veth_name, handle).await ;
     
-    println!("1 {}",obj["subnet"]);
+    
     let obj = Veth {
-        name:Some(Veth_name.clone()),
+        
 
         veth0_name: get_optional_string(obj, "veth0_name"),
         veth1_name: get_optional_string(obj, "veth1_name"),
+
+        veth0_insys_name: Some(insys_Veth_name.clone()),
+        veth1_insys_name: Some(insys_veth_peer_name.clone()),
 
         veth0_ip: get_optional_string(obj, "veth0_ip"),
         veth1_ip: get_optional_string(obj, "veth1_ip"),
@@ -90,7 +96,7 @@ fn get_optional_string(obj: &Value, key: &str) -> Option<String> {
 pub async fn CreateVeth(veth_name:&String,veth_peer_name:&String,handle:&Handle)->Result<(),Box<dyn std::error::Error>>{
     handle.link()
     .add()
-    .veth(veth_name.clone(), veth_peer_name.clone())
+    .veth(veth_name.into(), veth_peer_name.into())
     .execute()
     .await?;
 
@@ -128,3 +134,14 @@ pub  async fn GetIndexOfinterface(interface_name:&String,handle:&Handle)->u32{
     interface.header.index
 }
 
+
+pub async fn DeleteVeth(insys_veth_name :&String,handle:&Handle)->Result<(),Box<dyn std::error::Error>>{
+    let index=GetIndexOfinterface(insys_veth_name, handle).await;
+
+    handle.link()
+    .del(index)
+    .execute()
+    .await?;
+
+    Ok(())
+}

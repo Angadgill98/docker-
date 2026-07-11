@@ -85,22 +85,45 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
             let handle=Create_RT_Netlink().unwrap();
 
-            let veth_name=data["veth0_name"].as_str().unwrap().to_string();
-            let veth_peer_name=data["veth1_name"].as_str().unwrap().to_string();
-            
+           
             let insys_veth_name=format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string());
             let insys_veth_peer_name=format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string());
 
+            
             container::veth::CreateVeth(&insys_veth_name, &insys_veth_peer_name, &handle).await.expect("not able to craete veth pair");
 
             _=container::veth::CreateVethFile();
 
             let obj=container::veth::ReadVethFile().unwrap();
 
-            let veth=container::veth::VethStorageStruct(&insys_veth_name,&veth_name,&handle,&data ).await;
+            let veth=container::veth::VethStorageStruct(&insys_veth_name,&insys_veth_peer_name,&handle,&data ).await;
+
+            container::veth::WriteVethFile(obj, veth).expect("not able to write to file");
 
             
 
+        }
+        4=>{//Delete a veth
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
+            let handle=Create_RT_Netlink().unwrap();
+
+            let veth_name = data["veth0_name"].as_str().unwrap().to_string();
+            let insys_veth_name=format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string()); 
+
+
+            container::veth::DeleteVeth(&insys_veth_name, &handle).await?;
+
+            _=container::veth::CreateVethFile();
+
+            let mut obj=container::veth::ReadVethFile().unwrap();
+
+            let header=format!("{}_{}",veth_name,data["veth1_name"].as_str().unwrap());
+            obj.remove(&header);
+            fs::write("veth.json", serde_json::to_string_pretty(&obj)?)?;
+
+        }
+        5=>{//Connect veth to container or independent NET ns 
+            
         }
         _=>{
             println!("kn hua");
