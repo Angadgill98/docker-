@@ -63,6 +63,10 @@ fn handleInput(input:&String,socket:&mut TcpStream){
             let op:u8= input.trim().parse().unwrap(); 
             delete_veth(socket, &op);
         }
+        "5"=>{
+            let op:u8= input.trim().parse().unwrap(); 
+            delete_veth(socket, &op);
+        }
         _=>{
 
         }
@@ -233,22 +237,21 @@ fn delete_veth(socket:&mut TcpStream,input:&u8){
 
 
 
+
 fn Create_A_Container(input:&String){
     let mut container_name:String=String::new();
-    println!("Creating a Container");
     println!("Enter contianer name: ");
     std::io::stdin().read_line(&mut container_name).unwrap();
 
 
-    let mut app_name:String=String::new();
-    println!("Enter the app name");
-    std::io::stdin().read_line(&mut app_name).unwrap();
-
+    
 
     let env_vars=HandleENVpath();
     let commands=HandleCommands();
-    
     let app_commands=HandleAppCommands();
+
+
+    
     
     
 }
