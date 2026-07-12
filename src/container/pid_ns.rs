@@ -1,12 +1,8 @@
-use std::{fs::File, mem, os::fd::AsRawFd};
+use std::{collections::HashMap, ffi::CString, fs::{self, File, OpenOptions}, io::Write, mem, os::fd::AsRawFd};
+
 
 use libc::{
-    syscall,
-    SYS_clone3,
-    SIGCHLD,
-    CLONE_NEWPID,
-    CLONE_NEWNET,
-    CLONE_NEWNS
+    CLONE_NEWNET, CLONE_NEWNS, CLONE_NEWPID, MS_BIND, SIGCHLD, SYS_clone3, mount, syscall
 };
 
 #[repr(C)]
@@ -25,7 +21,7 @@ struct CloneArgs {
     cgroup: u64,
 }
 
-fn TempProcess()->i64{
+pub fn CreateContainer()->i64{
     println!("Enter the name of the pid namespace:");
     let mut input=String::new() ;
     std::io::stdin().read_line(&mut input).unwrap();
@@ -58,6 +54,31 @@ fn TempProcess()->i64{
         println!("Child PID = {}", pid);
     }
     pid
+}
+
+fn CreateContainerFile()->Result<(), Box<std::io::Error>>{
+    let mut file = match OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open("container.json")
+    {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            println!("Veth storage file already exists");
+            return Ok(());
+        }
+        Err(e) => return Err(Box::new(e)),
+    };
+
+    file.write_all(b"{}")?;
+    println!("Created the Veth storage file");
+
+    Ok(())
+}
+
+
+fn CreateContainerStruct(pid:&i64,container_name:&String){
+    
 }
 
 

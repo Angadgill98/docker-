@@ -129,6 +129,11 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
         5=>{//Create net ns 
             
         }
+
+        6=>{//Create a Contanier
+           let pid= container::pid_ns::CreateContainer();
+           
+        }
         _=>{
             println!("kn hua");
         }
