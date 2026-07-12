@@ -1,3 +1,13 @@
+use std::{fs::File, mem, os::fd::AsRawFd};
+
+use libc::{
+    syscall,
+    SYS_clone3,
+    SIGCHLD,
+    CLONE_NEWPID,
+    CLONE_NEWNET,
+    CLONE_NEWNS
+};
 
 #[repr(C)]
 #[derive(Default)]
@@ -15,7 +25,7 @@ struct CloneArgs {
     cgroup: u64,
 }
 
-fn TempProcess(){
+fn TempProcess()->i64{
     println!("Enter the name of the pid namespace:");
     let mut input=String::new() ;
     std::io::stdin().read_line(&mut input).unwrap();
@@ -40,11 +50,14 @@ fn TempProcess(){
         // Child process
         loop {
             unsafe {
-                libc::p
+                libc::pause();
             }
         }
     } else {
         // Parent process
         println!("Child PID = {}", pid);
     }
+    pid
 }
+
+
