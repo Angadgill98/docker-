@@ -12,8 +12,15 @@ use std::{default, fs::File, mem, os::fd::AsRawFd};
 mod cli;
 mod sokcet;
 mod brain;
-mod ns;
+
 mod container;
+
+
+mod interface;
+
+mod namespaces;
+
+
 fn main() {
     dotenvy::dotenv().ok();
     let (sender,rec)=std::sync::mpsc::channel::<()>();

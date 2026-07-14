@@ -1,141 +1,103 @@
-use std::{collections::{HashMap, hash_map}, fs::{self, File, OpenOptions}, io::Write, net::Ipv4Addr};
+use std::{collections::HashMap, fs::{self, OpenOptions}, io::Write, net::Ipv4Addr};
 
-use futures::{TryStreamExt};
 use rtnetlink::Handle;
-use serde::de::value;
-use serde_json::{Map, Value, value::Index};
+use serde_json::Value;
 
-use crate::container::bridge;
-
-
-
+use crate::interface::{self, Interface};
 
 use serde::{Serialize, Deserialize};
+#[derive(Clone,Serialize, Deserialize)]
+pub struct Bridge{
+    pub name:String,
+    pub insys: String,
 
-#[derive(Serialize, Deserialize)]
-pub struct Bridge {
-    bridge_name: String,
-    index: u32,
+    pub index: Option<u32>,
 
-    status: String,
-    ip:String,
-    subnet:u8,
-    network:String,
+    pub status: Option<String>,
 
-    insys: String,
-}
+    pub ip:Option<String>,
+    pub subnet:Option<u8>,
+    pub network:Option<String>,
 
-
-pub fn CreateBridgeFile() -> Result<(), Box<dyn std::error::Error>> {
-    let mut file = match OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open("bridge.json")
-    {
-        Ok(file) => file,
-        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-            println!("Bridge storage file already exists");
-            return Ok(());
-        }
-        Err(e) => return Err(Box::new(e)),
-    };
-
-    file.write_all(b"{}")?;
-    println!("Created the bridge storage file");
-
-    Ok(())
-}
-
-type Bridges_file=HashMap<String,Bridge>;
-pub fn ReadBridgeFile()->Result<Bridges_file,Box<dyn std::error::Error>>{
-    let paylaod=fs::read_to_string("bridge.json")?;
-    let mut obj:Bridges_file=serde_json::from_str(&paylaod)?;
-    Ok(obj)
-}
-
-pub fn WriteBridgeFile(mut obj:Bridges_file,bridge:Bridge)->Result<(),Box<dyn std::error::Error>>{
-    obj.insert(bridge.bridge_name.clone(), bridge);
-    fs::write("bridge.json", serde_json::to_string_pretty(&obj)?)?;
-    Ok(())
-}
-
-pub async fn BridgeStorageStruct(insys_bridge_name:&String,bridge_name :&String,handle:&Handle,obj:&Value)->Bridge{
-    let index=GetIndexOfinterface(&insys_bridge_name, handle).await ;
     
-    println!("1 {}",obj["subnet"]);
-    let obj=Bridge{
-        bridge_name:String::from(bridge_name),
-        index:index,
-        insys:format!("dc-{}", bridge_name),
-        ip:obj["ip"].as_str().unwrap().to_string(),
-        subnet:obj["subnet"].as_u64().unwrap() as u8,
-        status:obj["status"].as_str().unwrap().to_string(),
-        network:obj["network"].as_str().unwrap().to_string()
-    };
-    obj
+}
+
+impl Bridge {
+    pub async fn AssignIP(&self,handle:&Handle,data:&Value)->Result<(),Box<dyn std::error::Error>>{
+        let index=self.GetIndex(handle).await?;
+        handle
+        .address()
+        .add(
+            index,
+            data["ip"].as_str().unwrap().parse::<Ipv4Addr>().unwrap().into(),
+            data["subnet"].as_u64().unwrap() as u8,
+        )
+        .execute()
+        .await?;
+
+        Ok(())
+    }
+
+    pub fn CreateFile(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let mut file = match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open("bridge.json")
+        {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                println!("Bridge storage file already exists");
+                return Ok(());
+            }
+            Err(e) => return Err(Box::new(e)),
+        };
+
+        file.write_all(b"{}")?;
+        println!("Created the bridge storage file");
+
+        Ok(())
+    }
+
+    pub fn ReadFile(&self)->Result<HashMap<String,Self>,Box<dyn std::error::Error>>{
+        let paylaod=fs::read_to_string("bridge.json")?;
+        let obj:HashMap<String,Self>=serde_json::from_str(&paylaod)?;
+        Ok(obj)
+    }
+
+    pub fn WriteToFile(&self,mut obj:HashMap<String,Self>)->Result<(),Box<dyn std::error::Error>>{
+        obj.insert(self.name.clone(),self.clone());
+        fs::write("bridge.json", serde_json::to_string_pretty(&obj)?)?;
+        Ok(())
+    }    
 }
 
 
 
+impl interface::Interface for Bridge {
+    fn name(&self) -> &str {
+        &self.name
+    }
 
+    async fn Create(&self,handle:&rtnetlink::Handle)->Result<(), Box<dyn std::error::Error>> {
+        handle.link()
+            .add()
+            .bridge(self.insys.clone())
+            .execute()
+            .await?;
 
-pub async fn CreateBridge(insys_bridge_name:&String,handle:&Handle)->Result<(),Box<dyn std::error::Error>>{
+        Ok(())   
+    }
+
+    async fn Delete(&self,handle:&rtnetlink::Handle)->Result<(), Box<dyn std::error::Error>> {
+        let index=self.GetIndex(handle).await?;
+
+        handle.link()
+        .del(index)
+        .execute()
+        .await?;
+
+        Ok(())
+    }
     
-
-    handle.link()
-    .add()
-    .bridge(insys_bridge_name.clone())
-    .execute()
-    .await?;
-
-    Ok(())
 }
-
-
-
-
-
-
-pub async fn DeleteBridge(insys_bridge_name :&String,handle:&Handle)->Result<(),Box<dyn std::error::Error>>{
-    let index=GetIndexOfinterface(insys_bridge_name, handle).await;
-
-    handle.link()
-    .del(index)
-    .execute()
-    .await?;
-
-    Ok(())
-}
-
-
-
-
-pub async  fn AssignBridgeIP(insys_bridge_name :&String,handle:&Handle,data:&Value)->Result<(),Box<dyn std::error::Error>>{
-    let index=GetIndexOfinterface(insys_bridge_name, handle).await;
-    
-
-    handle
-    .address()
-    .add(
-        index,
-        data["ip"].as_str().unwrap().parse::<Ipv4Addr>().unwrap().into(),
-        data["subnet"].as_u64().unwrap() as u8,
-    )
-    .execute()
-    .await?;
-
-    Ok(())
-}
-
-
-async fn GetIndexOfinterface(interface_name:&String,handle:&Handle)->u32{
-    let mut links = handle
-    .link()
-    .get()
-    .match_name(interface_name.clone())
-    .execute();
-    let interface =links.try_next().await.unwrap().expect("cant find the interface");
-    interface.header.index
-}
-
 

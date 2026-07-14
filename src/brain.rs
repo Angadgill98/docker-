@@ -5,7 +5,7 @@ use rtnetlink::Handle;
 use serde_json::Value;
 
 
-use crate::{container::{self, bridge}, sokcet};
+use crate::{container::{self, bridge, veth}, interface::Interface, sokcet};
 
 
 
@@ -40,99 +40,155 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
     match op {
         1=>{//Create a bridge
             println!("Creating a bridge");
-            
-            
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj");
-            let handle=Create_RT_Netlink().unwrap();
-            let bridge_name=&data["name"].as_str().unwrap().to_string();
+            let handle: Handle=Create_RT_Netlink().unwrap();
+            let bridge_name=data["name"].as_str().unwrap().to_string();
             let insys_bridge_name=format!("dc-{}",bridge_name);
-            container::bridge::CreateBridge(&insys_bridge_name, &handle).await?;
+            let mut birdge=container::bridge::Bridge{
+                name:bridge_name,
+                insys:insys_bridge_name,
+
+                index:None,
+                status:None,
+                
+                ip:None,
+                subnet:None,
+                network:None
+
+            };
+            birdge.Create(&handle).await?;
             println!("Bridge created");
 
+
             println!("AssignBridgeIP");
+            birdge.AssignIP(&handle, &data).await?;
             
-            container::bridge::AssignBridgeIP(&insys_bridge_name, &handle,&data).await.expect("failed to assing ip to teh bridge");
-           
+
             println!("Storing in a file");
-            container::bridge::CreateBridgeFile()?;
-            let obj=container::bridge::ReadBridgeFile()?;
-            let bridge=container::bridge::BridgeStorageStruct(&insys_bridge_name,bridge_name, &handle,&data).await;
+            birdge.ip=Some(data["ip"].as_str().unwrap().to_string());
+            birdge.subnet=Some(data["subnet"].as_u64().unwrap() as u8);
+            birdge.network=Some(data["status"].as_str().unwrap().to_string());
+            birdge.network=Some(data["network"].as_str().unwrap().to_string());
+
+            birdge.CreateFile()?;
+            let BridgesMap= birdge.ReadFile()?;
+            birdge.WriteToFile(BridgesMap)?;
             
-            container::bridge::WriteBridgeFile(obj, bridge)?;
+            
+            
+            
         }
         2=>{//Delete a bridge
-            
-            
-               
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while deleting a bridge");
             let handle=Create_RT_Netlink().unwrap();
-            let bridge_name=&data["name"].as_str().unwrap().to_string();
+            
+            
+            let bridge_name=data["name"].as_str().unwrap().to_string();
             let insys_bridge_name=format!("dc-{}",bridge_name);
 
 
-            container::bridge::DeleteBridge(&insys_bridge_name, &handle).await?;
+            let mut birdge=container::bridge::Bridge{
+                name:bridge_name,
+                insys:insys_bridge_name,
 
-            container::bridge::CreateBridgeFile()?;
+                index:None,
+                status:None,
+                
+                ip:None,
+                subnet:None,
+                network:None
 
-            let mut obj=container::bridge::ReadBridgeFile()?;
+            };
+            birdge.Delete(&handle);
 
-            obj.remove(bridge_name);
-            fs::write("bridge.json", serde_json::to_string_pretty(&obj)?)?;
+            birdge.CreateFile()?;
+            let mut BridgesMap= birdge.ReadFile()?;
+
+            BridgesMap.remove(&birdge.name);
+            birdge.WriteToFile(BridgesMap)?;
             
             
-        }
-        
-        
+        }       
         3=>{//Create veth
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
             let handle=Create_RT_Netlink().unwrap();
 
-           
-            let insys_veth_name=format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string());
-            let insys_veth_peer_name=format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string());
+            let veth_pair=container::veth::VethPair{
+                veth_front:container::veth::VethEnd{
+                    name:data["veth0_name"].as_str().unwrap().to_string(),
+                    insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string())
+                },
+                veth_back:container::veth::VethEnd{
+                    name:data["veth1_name"].as_str().unwrap().to_string(),
+                    insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string())
+                }
+            };
 
+
+            veth_pair.Create(&handle);
             
-            container::veth::CreateVeth(&insys_veth_name, &insys_veth_peer_name, &handle).await.expect("not able to craete veth pair");
+            veth_pair.CreateVethFile();
 
-            _=container::veth::CreateVethFile();
-
-            let obj=container::veth::ReadVethFile().unwrap();
-
-            let veth=container::veth::VethStorageStruct(&insys_veth_name,&insys_veth_peer_name,&handle,&data ).await;
-
-            container::veth::WriteVethFile(obj, veth).expect("not able to write to file");
-
-            
+            let veth_file_map=veth_pair.ReadVethFile()?;            
+            veth_pair.WriteVethFile(veth_file_map)?;
 
         }
         4=>{//Delete a veth
-            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while deleting veth pair");
             let handle=Create_RT_Netlink().unwrap();
 
-            let veth_name = data["veth0_name"].as_str().unwrap().to_string();
-            let insys_veth_name=format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string()); 
+            let veth_pair=container::veth::VethPair{
+                veth_front:container::veth::VethEnd{
+                    name:data["veth0_name"].as_str().unwrap().to_string(),
+                    insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string())
+                },
+                veth_back:container::veth::VethEnd{
+                    name:data["veth1_name"].as_str().unwrap().to_string(),
+                    insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string())
+                }
+            };
 
+            veth_pair.Delete(&handle);
 
-            container::veth::DeleteVeth(&insys_veth_name, &handle).await?;
+            veth_pair.Create(&handle);
+            
+            veth_pair.CreateVethFile();
 
-            _=container::veth::CreateVethFile();
+            let veth_file_map=veth_pair.ReadVethFile()?;            
+            veth_file_map.remove(format!("{}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name).trim());
+            veth_pair.WriteVethFile(veth_file_map)?;            
 
-            let mut obj=container::veth::ReadVethFile().unwrap();
+            
 
-            let header=format!("{}_{}",veth_name,data["veth1_name"].as_str().unwrap());
-            obj.remove(&header);
-            fs::write("veth.json", serde_json::to_string_pretty(&obj)?)?;
-
-        }
-        
-        
+        }   
         5=>{//Create net ns 
             
         }
 
         6=>{//Create a Contanier
-           let pid= container::pid_ns::CreateContainer();
-           
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
+            let handle=Create_RT_Netlink().unwrap();
+
+
+            let parent_pid=std::process::id();
+            let child_pid= container::pid_ns::CreateContainer();
+
+            let bridge_name=&data["name"].as_str().unwrap().to_string();
+            let insys_bridge_name=format!("dc-{}",bridge_name);
+           // container::bridge::CreateBridge(&insys_bridge_name, &handle).await?;
+
+
+            let insys_veth0_name=format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string());
+            let insys_veth1_name=format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string());
+
+            
+            container::veth::CreateVeth(&insys_veth0_name, &insys_veth1_name, &handle).await.expect("not able to craete veth pair");
+
+            let index_veth0=container::veth::GetIndexOfinterface(&insys_veth0_name, &handle).await;
+            let index_veth1=container::veth::GetIndexOfinterface(&insys_veth0_name, &handle).await;
+
+
+          //  container::veth::SetVethEndpoints(index_veth0, veth_index, &handle).await;
         }
         _=>{
             println!("kn hua");
