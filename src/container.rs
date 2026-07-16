@@ -4,7 +4,7 @@ pub mod veth;
 
 
 
-use std::{collections::HashMap, ffi::CString, fs::{self, File, OpenOptions}, io::Write, mem, os::fd::AsRawFd, path::Path};
+use std::{collections::HashMap, ffi::CString, fs::{self, File, OpenOptions}, io::{Read, Write}, mem, os::fd::AsRawFd, path::Path};
 
 
 use libc::{
@@ -48,5 +48,71 @@ impl container{
         let child_pid=self.pid_ns.CreateTempProcess(&true, &true,& true);
         
     }
+
+
+    fn CreateInitFile()->Result<(), Box<std::io::Error>>{
+        let mut file = match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open("init.json")
+        {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                println!("Veth storage file already exists");
+                return Ok(());
+            }
+            Err(e) => return Err(Box::new(e)),
+        };
+
+        file.write_all(b"{}")?;
+        println!("Created the Veth storage file");
+
+        Ok(())
+    }
+
+    fn ReadInitFile()->Result<HashMap<String,String>,Box<dyn std::error::Error>>{
+        let json_str=fs::read_to_string("init.json")?;
+        let json:HashMap<String,String>=serde_json::from_str(json_str.as_str())?;
+
+        Ok(json)
+    }
+
+    fn WriteInitFile(){
+
+    }
+
+
+
+    fn CreateConFile()->Result<(), Box<std::io::Error>>{
+        let mut file = match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open("container.json")
+        {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                println!("Veth storage file already exists");
+                return Ok(());
+            }
+            Err(e) => return Err(Box::new(e)),
+        };
+
+        file.write_all(b"{}")?;
+        println!("Created the Veth storage file");
+
+        Ok(())
+    }
+
+    fn ReadConFile()->Result<HashMap<String,String>,Box<dyn std::error::Error>>{
+        let json_str=fs::read_to_string("container.json")?;
+        let json:HashMap<String,String>=serde_json::from_str(json_str.as_str())?;
+
+        Ok(json)
+    }
+
+    fn WriteConFile(){
+
+    }
+
 } 
     
