@@ -12,6 +12,8 @@ use libc::{
 };
 use serde_json::Value;
 
+use crate::namespaces::{self, Namespace};
+
 #[repr(C)]
 #[derive(Default)]
 struct CloneArgs {
@@ -29,3 +31,22 @@ struct CloneArgs {
 }
 
 
+pub struct container{
+    pub name:String,
+
+    pub bridge:bridge::Bridge,
+    pub veth:veth::VethPair,
+
+    pub mount_ns:namespaces::mount::mount,
+    pub net_ns:namespaces::net::Net_ns,
+    pub pid_ns:namespaces::pid::pid_ns
+}
+
+
+impl container{
+    pub fn Init(&self){
+        let child_pid=self.pid_ns.CreateTempProcess(&true, &true,& true);
+        
+    }
+} 
+    

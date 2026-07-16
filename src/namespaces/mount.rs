@@ -12,7 +12,7 @@ use crate::namespaces;
 
 
 
-struct mount {
+pub struct mount {
 
 }
 

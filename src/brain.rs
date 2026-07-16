@@ -1,11 +1,11 @@
-use std::{fs, io::Read};
+use std::{fmt::format, fs, io::Read};
 
 use futures::{TryStreamExt, future::ok, sink::Buffer};
 use rtnetlink::Handle;
 use serde_json::Value;
 
 
-use crate::{container::{self, bridge, veth}, interface::Interface, sokcet};
+use crate::{container::{self, bridge, veth}, interface::Interface, namespaces, sokcet};
 
 
 
@@ -71,7 +71,7 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             birdge.network=Some(data["network"].as_str().unwrap().to_string());
 
             birdge.CreateFile()?;
-            let BridgesMap= birdge.ReadFile()?;
+            let BridgesMap= container::bridge::Bridge::ReadFile()?;
             birdge.WriteToFile(BridgesMap)?;
             
             
@@ -102,7 +102,7 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             birdge.Delete(&handle);
 
             birdge.CreateFile()?;
-            let mut BridgesMap= birdge.ReadFile()?;
+            let mut BridgesMap= container::bridge::Bridge::ReadFile()?;
 
             BridgesMap.remove(&birdge.name);
             birdge.WriteToFile(BridgesMap)?;
@@ -169,7 +169,42 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
             let handle=Create_RT_Netlink().unwrap();
 
+            let name=data["name"].as_str().unwrap().to_string();
 
+            let bridge_name=data["bridge_name"].as_str().unwrap().to_string();
+            let BridgeMap=container::bridge::Bridge::ReadFile()?;
+
+            let bridge=BridgeMap.get(&bridge_name).ok_or_else(||format!("no bridge found for name {}",bridge_name))?;
+
+
+            let veth_pair=container::veth::VethPair{
+                veth_front:container::veth::VethEnd{
+                    name:data["veth0_name"].as_str().unwrap().to_string(),
+                    insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string())
+                },
+                veth_back:container::veth::VethEnd{
+                    name:data["veth1_name"].as_str().unwrap().to_string(),
+                    insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string())
+                }
+            };
+
+            let veth12=veth_pair.ReadVethFile()?;
+
+            let pair=veth12.get(format!("{}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name).as_str()).ok_or_else(||format!("no veth found for {}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name))?;
+
+            let container=container::container{
+                name:name.clone(),
+                bridge:bridge.clone(),
+                veth:pair.clone(),
+
+                mount_ns:namespaces::mount::mount{},
+                net_ns:namespaces::net::Net_ns{
+                    name:"".to_string()
+                },
+                pid_ns:namespaces::pid::pid_ns{}
+            };
+
+            container.Init();
         }
         _=>{
             println!("kn hua");

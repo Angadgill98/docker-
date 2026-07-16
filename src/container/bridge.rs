@@ -58,9 +58,9 @@ impl Bridge {
         Ok(())
     }
 
-    pub fn ReadFile(&self)->Result<HashMap<String,Self>,Box<dyn std::error::Error>>{
+    pub fn ReadFile()->Result<HashMap<String,Bridge>,Box<dyn std::error::Error>>{
         let paylaod=fs::read_to_string("bridge.json")?;
-        let obj:HashMap<String,Self>=serde_json::from_str(&paylaod)?;
+        let obj:HashMap<String,Bridge>=serde_json::from_str(&paylaod)?;
         Ok(obj)
     }
 

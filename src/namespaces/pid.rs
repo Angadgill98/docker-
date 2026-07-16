@@ -5,7 +5,7 @@ use crate::{interface, namespaces};
 
 
 
-struct pid_ns{
+pub struct pid_ns{
 
 }
 
@@ -30,5 +30,6 @@ impl namespaces::Namespace for pid_ns {
 
         Ok(())
     }
+    
     
 }

@@ -26,7 +26,7 @@ struct CloneArgs {
     cgroup: u64,
 }
 
-trait Namespace {
+pub trait Namespace {
     fn Create(&self,net_flag:&bool,pid_flag:&bool,mount_flag:&bool);
 
     fn BindMount(&self,child_pid:i64)->Result<(),Box<dyn std::error::Error>>;

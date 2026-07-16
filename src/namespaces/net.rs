@@ -31,8 +31,8 @@ struct CloneArgs {
 
 
 
-struct Net_ns{
-    name:String
+pub struct Net_ns{
+    pub name:String
 }
 
 impl Net_ns {
@@ -75,15 +75,7 @@ impl Net_ns {
     }
 
 
-    pub async fn GetIndex(&self,handle:&Handle)->Result<u32, Box<dyn std::error::Error>>{
-        let mut links=handle.link()
-        .get()
-        .match_name(self.name.to_string())
-        .execute();
-        
-        let temp=links.try_next().await?.ok_or_else(||format!("no interface fount for {}",self.name))?;
-        Ok(temp.header.index)
-    }
+    
 }
 
 impl namespaces::Namespace for Net_ns {
