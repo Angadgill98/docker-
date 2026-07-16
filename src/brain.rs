@@ -154,7 +154,7 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             
             veth_pair.CreateVethFile();
 
-            let veth_file_map=veth_pair.ReadVethFile()?;            
+            let mut veth_file_map=veth_pair.ReadVethFile()?;            
             veth_file_map.remove(format!("{}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name).trim());
             veth_pair.WriteVethFile(veth_file_map)?;            
 
@@ -170,25 +170,6 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             let handle=Create_RT_Netlink().unwrap();
 
 
-            let parent_pid=std::process::id();
-            let child_pid= container::pid_ns::CreateContainer();
-
-            let bridge_name=&data["name"].as_str().unwrap().to_string();
-            let insys_bridge_name=format!("dc-{}",bridge_name);
-           // container::bridge::CreateBridge(&insys_bridge_name, &handle).await?;
-
-
-            let insys_veth0_name=format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string());
-            let insys_veth1_name=format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string());
-
-            
-            container::veth::CreateVeth(&insys_veth0_name, &insys_veth1_name, &handle).await.expect("not able to craete veth pair");
-
-            let index_veth0=container::veth::GetIndexOfinterface(&insys_veth0_name, &handle).await;
-            let index_veth1=container::veth::GetIndexOfinterface(&insys_veth0_name, &handle).await;
-
-
-          //  container::veth::SetVethEndpoints(index_veth0, veth_index, &handle).await;
         }
         _=>{
             println!("kn hua");

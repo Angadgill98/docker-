@@ -6,9 +6,11 @@ use crate::namespaces;
 use std::{collections::HashMap, ffi::CString, fs::{self, File, OpenOptions}, io::Write, mem, os::fd::AsRawFd, path::Path};
 
 
+use futures::TryStreamExt;
 use libc::{
-    CLONE_NEWNET, CLONE_NEWNS, CLONE_NEWPID, MS_BIND, SIGCHLD, SYS_clone3, mount, syscall
-};
+    CLONE_NEWNET, CLONE_NEWNS, CLONE_NEWPID, IN_UNMOUNT, MS_BIND, SIGCHLD, SYS_clone3, mount, syscall
+};   
+use rtnetlink::Handle;
 use serde_json::Value;
 
 #[repr(C)]
@@ -43,7 +45,45 @@ impl Net_ns {
         Path::new(path).is_file()
     }
 
-    
+    fn JoinProcessNS(&self,target_pid:&i64)->Result<(),Box<dyn std::error::Error>>{
+        let file = File::open(format!("/proc/{}/ns/net",target_pid))?;
+        let fd = file.as_raw_fd();
+        
+        let result = unsafe {
+            libc::setns(fd, CLONE_NEWNET)
+        };
+
+        if result != 0 {
+            panic!("setns failed");
+        }
+        Ok(())
+    }
+
+    fn JoinNamedNS(&self,target_ns_name:&String)->Result<(),Box<dyn std::error::Error>>{
+        //insert path here
+        let file = File::open(format!("{}",target_ns_name))?;
+        let fd = file.as_raw_fd();
+
+        let result = unsafe {
+            libc::setns(fd, CLONE_NEWNET)
+        };
+
+        if result != 0 {
+            panic!("setns failed");
+        }
+        Ok(())
+    }
+
+
+    pub async fn GetIndex(&self,handle:&Handle)->Result<u32, Box<dyn std::error::Error>>{
+        let mut links=handle.link()
+        .get()
+        .match_name(self.name.to_string())
+        .execute();
+        
+        let temp=links.try_next().await?.ok_or_else(||format!("no interface fount for {}",self.name))?;
+        Ok(temp.header.index)
+    }
 }
 
 impl namespaces::Namespace for Net_ns {
@@ -52,9 +92,9 @@ impl namespaces::Namespace for Net_ns {
 
     }
 
-    fn BindMount(&self,net_flag:&bool,pid_flag:&bool,mount_flag:&bool,name:&String)->Result<(),Box<dyn std::error::Error>>{
-        let child_pid=self.CreateTempProcess(net_flag, pid_flag, mount_flag);
-
+    fn BindMount(&self,child_pid:i64)->Result<(),Box<dyn std::error::Error>>{
+        
+        //name is with self 
         let source=CString::new("").unwrap();
         
         let target=CString::new("").unwrap();
@@ -77,7 +117,17 @@ impl namespaces::Namespace for Net_ns {
         Ok(())
     }
 
-    fn Delete(&self) {
-        
+    fn Delete(&self,target_mount:&String) {
+        let target=CString::new("").unwrap();
+
+        let ret = unsafe {
+            libc::umount(target.as_ptr())
+        };
+
+        if ret != 0 {
+            panic!("umount failed");
+        }
+
+        println!("Bind mount is reomved the namspce will be remove d once the process referencing to it stops");
     }
 }

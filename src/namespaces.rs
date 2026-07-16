@@ -1,5 +1,6 @@
 pub mod net;
-
+pub mod mount;
+pub mod pid;
 
 use std::{collections::HashMap, ffi::CString, fs::{self, File, OpenOptions}, io::Write, mem, os::fd::AsRawFd, path::Path};
 
@@ -28,9 +29,9 @@ struct CloneArgs {
 trait Namespace {
     fn Create(&self,net_flag:&bool,pid_flag:&bool,mount_flag:&bool);
 
-    fn BindMount(&self,net_flag:&bool,pid_flag:&bool,mount_flag:&bool,name:&String)->Result<(),Box<dyn std::error::Error>>;
+    fn BindMount(&self,child_pid:i64)->Result<(),Box<dyn std::error::Error>>;
 
-    fn Delete(&self);
+    fn Delete(&self,target_mount:&String);
 
     fn CreateTempProcess(&self,net_flag:&bool,pid_flag:&bool,mount_flag:&bool)->i64{
         
