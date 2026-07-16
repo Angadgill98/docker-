@@ -186,7 +186,7 @@ impl VethPair {
     }
 
     pub fn WriteVethFile(&self,mut VethFileMap:HashMap<String,VethPair>)->Result<(),Box<dyn std::error::Error>>{
-        VethFileMap.insert(format!("{}_{}",self.veth_front.name,self.veth_back.name), self.clone());
+        
         fs::write("veth.json", serde_json::to_string_pretty(&VethFileMap)?)?;
         Ok(())
     }
@@ -220,12 +220,15 @@ impl VethEnd{
         .await.expect("failed to move veth to the net ns");
     }
 
+    pub fn AssignIP(){
+        
+    } 
     
 }
 
 impl interface::Interface for VethPair{
     fn name(&self)->&str {
-        self.veth_front.name.as_str()
+        self.veth_front.insys.as_str()
     }
     async fn Create(&self,handle:&rtnetlink::Handle)-> Result<(), Box<dyn std::error::Error>> {
         let veth0_name=self.veth_front.insys.clone();

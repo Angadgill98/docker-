@@ -67,11 +67,12 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             println!("Storing in a file");
             birdge.ip=Some(data["ip"].as_str().unwrap().to_string());
             birdge.subnet=Some(data["subnet"].as_u64().unwrap() as u8);
-            birdge.network=Some(data["status"].as_str().unwrap().to_string());
+            birdge.status=Some(data["status"].as_str().unwrap().to_string());
             birdge.network=Some(data["network"].as_str().unwrap().to_string());
 
             birdge.CreateFile()?;
-            let BridgesMap= container::bridge::Bridge::ReadFile()?;
+            let mut BridgesMap= container::bridge::Bridge::ReadFile()?;
+            BridgesMap.insert(birdge.name.clone(), birdge.clone());
             birdge.WriteToFile(BridgesMap)?;
             
             
@@ -99,7 +100,7 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
                 network:None
 
             };
-            birdge.Delete(&handle);
+            birdge.Delete(&handle).await?;
 
             birdge.CreateFile()?;
             let mut BridgesMap= container::bridge::Bridge::ReadFile()?;
@@ -125,11 +126,12 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             };
 
 
-            veth_pair.Create(&handle);
+            veth_pair.Create(&handle).await?;
             
-            veth_pair.CreateVethFile();
+            veth_pair.CreateVethFile()?;
 
-            let veth_file_map=veth_pair.ReadVethFile()?;            
+            let mut veth_file_map=veth_pair.ReadVethFile()?;    
+            veth_file_map.insert(format!("{}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name), veth_pair.clone());        
             veth_pair.WriteVethFile(veth_file_map)?;
 
         }
@@ -148,11 +150,11 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
                 }
             };
 
-            veth_pair.Delete(&handle);
+            veth_pair.Delete(&handle).await?;
 
-            veth_pair.Create(&handle);
             
-            veth_pair.CreateVethFile();
+            
+            veth_pair.CreateVethFile()?;
 
             let mut veth_file_map=veth_pair.ReadVethFile()?;            
             veth_file_map.remove(format!("{}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name).trim());

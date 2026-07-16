@@ -65,7 +65,7 @@ impl Bridge {
     }
 
     pub fn WriteToFile(&self,mut obj:HashMap<String,Self>)->Result<(),Box<dyn std::error::Error>>{
-        obj.insert(self.name.clone(),self.clone());
+    
         fs::write("bridge.json", serde_json::to_string_pretty(&obj)?)?;
         Ok(())
     }    
@@ -75,7 +75,7 @@ impl Bridge {
 
 impl interface::Interface for Bridge {
     fn name(&self) -> &str {
-        &self.name
+        &self.insys
     }
 
     async fn Create(&self,handle:&rtnetlink::Handle)->Result<(), Box<dyn std::error::Error>> {
