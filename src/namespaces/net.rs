@@ -74,7 +74,17 @@ impl Net_ns {
         Ok(())
     }
 
+    pub fn CreateFile(){
 
+    }
+
+    pub fn WriteFile(){
+
+    }
+
+    pub fn ReadFile(){
+
+    }
     
 }
 

@@ -5,7 +5,7 @@ use rtnetlink::Handle;
 use serde_json::Value;
 
 
-use crate::{container::{self, bridge, veth}, interface::Interface, namespaces, sokcet};
+use crate::{container::{self, bridge, veth}, interface::Interface, namespaces::{self, Namespace}, sokcet};
 
 
 
@@ -164,10 +164,24 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
 
         }   
         5=>{//Create net ns 
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
+            let handle=Create_RT_Netlink().unwrap();
+
+            let name=data["name"].as_str().unwrap().to_string();
+            let net_ns=namespaces::net::Net_ns{
+                name:name.clone()
+            };
+            let child_pid=net_ns.CreateTempProcess(&true, &false, &false);
+            net_ns.BindMount(child_pid)?;
+
             
         }
-
         6=>{//Create a Contanier
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
+            let handle=Create_RT_Netlink().unwrap();
+        }
+
+        10=>{
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
             let handle=Create_RT_Netlink().unwrap();
 

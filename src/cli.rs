@@ -64,8 +64,15 @@ fn handleInput(input:&String,socket:&mut TcpStream){
             delete_veth(socket, &op);
         }
         "5"=>{
-            let op:u8= input.trim().parse().unwrap(); 
-            delete_veth(socket, &op);
+            let op:u8= input.trim().parse().unwrap();
+            CreateNet_ns(socket, &op);
+        }
+        "6"=>{
+            let op:u8= input.trim().parse().unwrap();
+            CreateMount_ns(socket, &op);
+        }
+        "7"=>{
+            
         }
         _=>{
 
@@ -110,7 +117,6 @@ fn CreateBrdige(socket:&mut TcpStream,input:&u8){
     socket.write_all(json.as_bytes());  
     
 }
-
 
 fn GetSubnet()->u8{
      println!("Enter subnet prefix (e.g. 24):");
@@ -234,6 +240,63 @@ fn delete_veth(socket:&mut TcpStream,input:&u8){
     
 }
 
+
+
+fn CreateNet_ns(socket:&mut TcpStream,input:&u8){
+    println!("Enter the name of net ns");
+    let net_ns_name=CLI_Input();
+
+    let data=json!({
+        "name":&net_ns_name.trim(),
+    });
+
+    let op=input.clone();
+
+    let json = serde_json::to_string(&data).unwrap();
+    let len=json.len();
+
+    socket.write_all(&[op]);  
+    socket.write_all(&[len as u8]);
+    socket.write_all(json.as_bytes());  
+    
+}
+
+fn CreateMount_ns(socket:&mut TcpStream,input:&u8){
+    println!("Enter the name of the mount ns:");
+    let mount_name=CLI_Input();
+
+    println!("Enter the name of the image need to implemen,available images are :");
+    println!("Ubuntu");
+    let mut  image_name=CLI_Input();
+
+    loop {
+        match image_name.trim() {
+            "Ubuntu"=>{
+                break;
+            }
+            _=>{
+                println!("invalid input enter valid input");
+                image_name=CLI_Input();
+            }
+        }
+    }
+
+    let data=json!({
+        "name":mount_name.clone().trim(),
+        "image":image_name.clone().trim()
+    });
+    let op=input.clone();
+
+    let json=serde_json::to_string(&data).unwrap();
+
+    let len=json.len();
+
+    socket.write_all(&[op]);  
+    socket.write_all(&[len as u8]);
+    socket.write_all(json.as_bytes());
+
+
+}
 
 
 
