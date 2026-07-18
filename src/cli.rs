@@ -34,6 +34,11 @@ fn CLI_printer(){
 
     println!("3: Create a veth apair");
     println!("4: Delete a veth");
+
+    println!("");
+
+    println!("5: Create net ns");
+    println!("6: Delete net ns");
 }
 
 fn CLI_Input()->String{
@@ -69,11 +74,12 @@ fn handleInput(input:&String,socket:&mut TcpStream){
         }
         "6"=>{
             let op:u8= input.trim().parse().unwrap();
-            CreateMount_ns(socket, &op);
+            DeleteNet_ns(socket, &op);
         }
-        "7"=>{
-            
-        }
+        // "7"=>{
+        //     let op:u8= input.trim().parse().unwrap();
+        //     CreateMount_ns(socket, &op);
+        // }
         _=>{
 
         }
@@ -260,6 +266,26 @@ fn CreateNet_ns(socket:&mut TcpStream,input:&u8){
     socket.write_all(json.as_bytes());  
     
 }
+
+fn DeleteNet_ns(socket:&mut TcpStream,input:&u8){
+    println!("Enter the name of net ns");
+    let net_ns_name=CLI_Input();
+
+    let data=json!({
+        "name":&net_ns_name.trim(),
+    });
+
+    let op=input.clone();
+
+    let json = serde_json::to_string(&data).unwrap();
+    let len=json.len();
+
+    socket.write_all(&[op]);  
+    socket.write_all(&[len as u8]);
+    socket.write_all(json.as_bytes());  
+}
+
+
 
 fn CreateMount_ns(socket:&mut TcpStream,input:&u8){
     println!("Enter the name of the mount ns:");

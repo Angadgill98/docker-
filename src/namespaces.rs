@@ -75,4 +75,11 @@ pub trait Namespace {
         pid
     }
 
+    fn KillChild(&self,child_pid:i64){
+        unsafe {
+            libc::kill(child_pid as libc::pid_t, libc::SIGKILL);
+            libc::waitpid(child_pid as libc::pid_t, std::ptr::null_mut(), 0);
+        }
+    }
+
 }

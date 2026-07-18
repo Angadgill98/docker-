@@ -31,6 +31,10 @@ struct CloneArgs {
 
 
 
+use serde::{Serialize, Deserialize};
+
+
+#[derive(Clone,Serialize, Deserialize)]
 pub struct Net_ns{
     pub name:String
 }
@@ -74,17 +78,55 @@ impl Net_ns {
         Ok(())
     }
 
-    pub fn CreateFile(){
+    pub fn CreateFile(&self)->Result<(), Box<std::io::Error>>{
+        let mut file = match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open("net_ns.json")
+        {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                println!("net ns storage file already exists");
+                return Ok(());
+            }
+            Err(e) => return Err(Box::new(e)),
+        };
 
+        file.write_all(b"{}")?;
+        println!("Created the net ns storage file");
+
+        Ok(())
     }
 
-    pub fn WriteFile(){
-
+    pub fn ReadFile(&self)->Result<HashMap<String,Self>,Box<dyn std::error::Error>>{
+        let paylaod=fs::read_to_string("net_ns.json")?;
+        let obj:HashMap<String,Self>=serde_json::from_str(&paylaod)?;
+        Ok(obj)
     }
 
-    pub fn ReadFile(){
+    pub fn WriteToFile(&self,mut obj:HashMap<String,Self>)->Result<(),Box<dyn std::error::Error>>{
+    
+        fs::write("net_ns.json", serde_json::to_string_pretty(&obj)?)?;
+        Ok(())
+    } 
+    
+    fn RemoveBindMount(&self){
+        let target = CString::new(format!("dc_ns/net/{}",self.name)).unwrap();
+        let ret=unsafe {
+            libc::umount2(target.as_ptr(), libc::MNT_DETACH)
+        };
 
+        if ret != 0 {
+            eprintln!("umount failed: {}", std::io::Error::last_os_error());
+        }
+        
     }
+
+    fn DeleteFile(&self)->Result<(),Box<dyn std::error::Error>>{
+        fs::remove_file(format!("dc_ns/net/{}", self.name))?;
+        Ok(())
+    }
+
     
 }
 
@@ -97,39 +139,35 @@ impl namespaces::Namespace for Net_ns {
     fn BindMount(&self,child_pid:i64)->Result<(),Box<dyn std::error::Error>>{
         
         //name is with self 
-        let source=CString::new("").unwrap();
+        let source=CString::new(format!("/proc/{}/ns/net",child_pid)).unwrap();
         
-        let target=CString::new("").unwrap();
+        let target=CString::new(format!("dc_ns/net/{}",self.name)).unwrap();
 
         self.verify_file(source.to_str()?);
         
-        File::create(&target.to_str()?);
+        std::fs::create_dir_all(format!("dc_ns/net"))?;
+        File::create(&target.to_str()?)?;
 
-        unsafe {
+        let ret=unsafe {
             mount(
                 source.as_ptr(),
                 target.as_ptr(),
                 std::ptr::null(),
                 MS_BIND,
                 std::ptr::null(),
-            );
+            )
 
+        };
+        if ret != 0 {
+            return Err(std::io::Error::last_os_error().into());
         }
 
         Ok(())
     }
 
     fn Delete(&self,target_mount:&String) {
-        let target=CString::new("").unwrap();
-
-        let ret = unsafe {
-            libc::umount(target.as_ptr())
-        };
-
-        if ret != 0 {
-            panic!("umount failed");
-        }
-
+        self.RemoveBindMount();
+        self.DeleteFile().unwrap();
         println!("Bind mount is reomved the namspce will be remove d once the process referencing to it stops");
     }
 }

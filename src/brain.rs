@@ -164,7 +164,7 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
 
         }   
         5=>{//Create net ns 
-            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating net ns");
             let handle=Create_RT_Netlink().unwrap();
 
             let name=data["name"].as_str().unwrap().to_string();
@@ -174,14 +174,76 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             let child_pid=net_ns.CreateTempProcess(&true, &false, &false);
             net_ns.BindMount(child_pid)?;
 
+            net_ns.KillChild(child_pid.clone());
+
+            net_ns.CreateFile()?;
+            let mut ns= net_ns.ReadFile()?;
+            ns.insert(net_ns.name.clone(), net_ns.clone());
+            net_ns.WriteToFile(ns)?;
+
             
         }
-        6=>{//Create a Contanier
+        6=>{//Delete net ns
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
             let handle=Create_RT_Netlink().unwrap();
+
+
+            let name=data["name"].as_str().unwrap().to_string();
+            let net_ns=namespaces::net::Net_ns{
+                name:name.clone()
+            };
+
+            net_ns.Delete(&name);
+
+            net_ns.CreateFile()?;
+            let mut ns= net_ns.ReadFile()?;
+            ns.remove(&net_ns.name);
+            net_ns.WriteToFile(ns)?;
+
+
+        }
+        7=>{//Create mount ns
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
+            let handle=Create_RT_Netlink().unwrap();
+
+            let name=data["name"].as_str().unwrap().to_string();
+
+            let mount=namespaces::mount::mount{
+                name:name.clone()
+            };
+
+            let child_pid=mount.CreateTempProcess(&false, &false, &true);
+
+            mount.BindMount(child_pid)?;
+
+            mount.KillChild(child_pid);
+
+
+            mount.CreateFile()?;
+            let mut ns= mount.ReadFile()?;
+            ns.insert(mount.name.clone(), mount.clone());
+            mount.WriteToFile(ns)?;
+
+        }
+        8=>{//Delete mount ns 
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
+            let handle=Create_RT_Netlink().unwrap();
+
+            let name=data["name"].as_str().unwrap().to_string();
+            let mount=namespaces::mount::mount{
+                name:name.clone()
+            };
+
+            mount.Unmount();
+
+            mount.CreateFile()?;
+            let mut ns= mount.ReadFile()?;
+            ns.remove(&name);
+            mount.WriteToFile(ns)?;
         }
 
-        10=>{
+        
+        10=>{//Create a Contanier
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
             let handle=Create_RT_Netlink().unwrap();
 
@@ -208,19 +270,19 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
 
             let pair=veth12.get(format!("{}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name).as_str()).ok_or_else(||format!("no veth found for {}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name))?;
 
-            let container=container::container{
-                name:name.clone(),
-                bridge:bridge.clone(),
-                veth:pair.clone(),
+            // let container=container::container{
+            //     name:name.clone(),
+            //     bridge:bridge.clone(),
+            //     veth:pair.clone(),
 
-                mount_ns:namespaces::mount::mount{},
-                net_ns:namespaces::net::Net_ns{
-                    name:"".to_string()
-                },
-                pid_ns:namespaces::pid::pid_ns{}
-            };
+            //     mount_ns:namespaces::mount::mount{},
+            //     net_ns:namespaces::net::Net_ns{
+            //         name:"".to_string()
+            //     },
+            //     pid_ns:namespaces::pid::pid_ns{}
+            // };
 
-            container.Init();
+            // container.Init();
         }
         _=>{
             println!("kn hua");

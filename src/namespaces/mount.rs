@@ -1,4 +1,4 @@
-use std::{ffi::CString, fs::File, os::fd::AsRawFd, path::Path};
+use std::{collections::HashMap, ffi::CString, fs::{self, File, OpenOptions}, io::Write, os::fd::AsRawFd, path::Path};
 
 use flate2::{read::GzDecoder};
 use libc::MS_BIND;
@@ -10,10 +10,12 @@ use crate::namespaces;
 
 
 
+use serde::{Serialize, Deserialize};
 
 
+#[derive(Clone,Serialize, Deserialize)]
 pub struct mount {
-
+   pub name :String
 }
 
 
@@ -72,8 +74,8 @@ impl mount {
         Ok(())
     }
 
-    fn Unmount(&self,target:&String){
-        let target = CString::new(format!("{}",target)).unwrap();
+    pub fn Unmount(&self){
+        let target = CString::new(format!("dc_ns/mount/{}",self.name)).unwrap();
 
         let ret = unsafe {
             libc::umount2(target.as_ptr(), libc::MNT_DETACH)
@@ -86,11 +88,14 @@ impl mount {
         }
     }
 
-    fn NewRoot(&self)->Result<(), Box<dyn std::error::Error>>{
-        let new_root = CString::new("/container_root")?;
-        let put_old = CString::new("/container_root/old_root")?;
+    pub fn NewRoot(&self)->Result<(), Box<dyn std::error::Error>>{
+        let new_root = CString::new(format!("dc_ns/mount/{}",self.name))?;
+        let put_old = CString::new(format!("dc_ns/mount/{}/old_root",self.name))?;
 
         // Ensure /container_root/old_root exists before calling pivot_root.
+
+        std::fs::create_dir_all(format!("dc_ns/mount/{}/old_root",self.name))?;
+
 
         let ret = unsafe {
             libc::syscall(
@@ -121,6 +126,39 @@ impl mount {
         };
         Ok(())
     }
+
+    pub fn CreateFile(&self)->Result<(), Box<std::io::Error>>{
+        let mut file = match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open("mount_ns.json")
+        {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                println!("mount ns storage file already exists");
+                return Ok(());
+            }
+            Err(e) => return Err(Box::new(e)),
+        };
+
+        file.write_all(b"{}")?;
+        println!("Created the mount ns storage file");
+
+        Ok(())
+    }
+
+    pub fn ReadFile(&self)->Result<HashMap<String,Self>,Box<dyn std::error::Error>>{
+        let paylaod=fs::read_to_string("mount_ns.json")?;
+        let obj:HashMap<String,Self>=serde_json::from_str(&paylaod)?;
+        Ok(obj)
+    }
+
+    pub fn WriteToFile(&self,mut obj:HashMap<String,Self>)->Result<(),Box<dyn std::error::Error>>{
+    
+        fs::write("mount_ns.json", serde_json::to_string_pretty(&obj)?)?;
+        Ok(())
+    } 
+    
 }
 
 impl namespaces::Namespace for mount {
@@ -131,13 +169,14 @@ impl namespaces::Namespace for mount {
     fn BindMount(&self,child_pid:i64)->Result<(),Box<dyn std::error::Error>> {
         
         //name is with self 
-        let source=CString::new("").unwrap();
+        let source=CString::new(format!("/proc/{}/ns/mnt",child_pid)).unwrap();
         
-        let target=CString::new("").unwrap();
+        let target=CString::new(format!("dc_ns/mount/{}",self.name)).unwrap();
 
         self.verify_file(source.to_str()?);
         
-        File::create(&target.to_str()?);
+        std::fs::create_dir_all(format!("dc_ns/mount"))?;
+        File::create(&target.to_str()?)?;
 
         unsafe {
             libc::mount(
