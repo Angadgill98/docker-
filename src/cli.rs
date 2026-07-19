@@ -3,7 +3,7 @@ use std::{fs::File, io::{BufRead, BufReader, Read, Write}, net::{IpAddr, Ipv4Add
 use libc::statvfs;
 use serde_json::{error::Category::Data, json};
 
-use crate::sokcet;
+use crate::{container::bridge, sokcet};
 
 use ipnetwork::Ipv4Network;
 
@@ -39,6 +39,13 @@ fn CLI_printer(){
 
     println!("5: Create net ns");
     println!("6: Delete net ns");
+
+    println!("");
+
+    println!("5: Create mount ns");
+    println!("6: Delete mount ns");
+
+
 }
 
 fn CLI_Input()->String{
@@ -76,10 +83,14 @@ fn handleInput(input:&String,socket:&mut TcpStream){
             let op:u8= input.trim().parse().unwrap();
             DeleteNet_ns(socket, &op);
         }
-        // "7"=>{
-        //     let op:u8= input.trim().parse().unwrap();
-        //     CreateMount_ns(socket, &op);
-        // }
+        "7"=>{
+            let op:u8= input.trim().parse().unwrap();
+            CreateMount_ns(socket, &op);
+        }
+        "8"=>{
+            let op:u8= input.trim().parse().unwrap();
+            DeleteMount_ns(socket, &op);
+        }
         _=>{
 
         }
@@ -291,25 +302,62 @@ fn CreateMount_ns(socket:&mut TcpStream,input:&u8){
     println!("Enter the name of the mount ns:");
     let mount_name=CLI_Input();
 
-    println!("Enter the name of the image need to implemen,available images are :");
-    println!("Ubuntu");
-    let mut  image_name=CLI_Input();
+    // println!("Enter the name of the image need to implemen,available images are :");
+    // println!("Ubuntu");
+    // let mut  image_name=CLI_Input();
 
-    loop {
-        match image_name.trim() {
-            "Ubuntu"=>{
-                break;
-            }
-            _=>{
-                println!("invalid input enter valid input");
-                image_name=CLI_Input();
-            }
-        }
-    }
+    // loop {
+    //     match image_name.trim() {
+    //         "Ubuntu"=>{
+    //             break;
+    //         }
+    //         _=>{
+    //             println!("invalid input enter valid input");
+    //             image_name=CLI_Input();
+    //         }
+    //     }
+    // }
 
     let data=json!({
         "name":mount_name.clone().trim(),
-        "image":image_name.clone().trim()
+        //"image":image_name.clone().trim()
+    });
+    let op=input.clone();
+
+    let json=serde_json::to_string(&data).unwrap();
+
+    let len=json.len();
+
+    socket.write_all(&[op]);  
+    socket.write_all(&[len as u8]);
+    socket.write_all(json.as_bytes());
+
+
+}
+
+fn DeleteMount_ns(socket:&mut TcpStream,input:&u8){
+    println!("Enter the name of the mount ns:");
+    let mount_name=CLI_Input();
+
+    // println!("Enter the name of the image need to implemen,available images are :");
+    // println!("Ubuntu");
+    // let mut  image_name=CLI_Input();
+
+    // loop {
+    //     match image_name.trim() {
+    //         "Ubuntu"=>{
+    //             break;
+    //         }
+    //         _=>{
+    //             println!("invalid input enter valid input");
+    //             image_name=CLI_Input();
+    //         }
+    //     }
+    // }
+
+    let data=json!({
+        "name":mount_name.clone().trim(),
+        //"image":image_name.clone().trim()
     });
     let op=input.clone();
 
@@ -325,6 +373,53 @@ fn CreateMount_ns(socket:&mut TcpStream,input:&u8){
 }
 
 
+
+fn CreateContainer(socket:&mut TcpStream,input:&u8){
+    println!("Enter the name of the container");
+    let name=CLI_Input();
+
+    println!("Enter the name of the image need to implemen,available images are :");
+    println!("Ubuntu");
+    let mut  image=CLI_Input();
+
+    loop {
+        match image.trim() {
+            "Ubuntu"=>{
+                break;
+            }
+            _=>{
+                println!("invalid input enter valid input");
+                image=CLI_Input();
+            }
+        }
+    }
+
+    println!("Enter the name of the bridge:");
+    let bridge_name=CLI_Input();
+
+    println!("Enter the names of the veth0 and veth1 ");
+    println!("Name for veth0 (connecting to the container");
+    let veth0=CLI_Input();
+    
+    println!("Name for veth 1(conencted to bridge");
+    let veth1=CLI_Input();
+
+    let data=json!({
+        "name":name.trim(),
+        "image":image.trim()
+    });
+
+    let op=input.clone();
+
+    let json =serde_json::to_string(&data).unwrap();
+
+    let len=json.len();
+
+    socket.write_all(&[op]);  
+    socket.write_all(&[len as u8]);
+    socket.write_all(json.as_bytes());
+
+}
 
 
 fn Create_A_Container(input:&String){
