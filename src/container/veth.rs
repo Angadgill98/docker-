@@ -198,10 +198,12 @@ impl VethPair {
 pub struct VethEnd{
     pub name: String,
     pub insys: String,
+
+    pub index:Option<u32>
 }
 
 impl VethEnd{
-    pub  async fn GetIndex(&self,handle:&Handle)->u32{
+    pub async fn GetIndex(&self,handle:&Handle)->u32{
         let mut links = handle
         .link()
         .get()
@@ -220,9 +222,20 @@ impl VethEnd{
         .await.expect("failed to move veth to the net ns");
     }
 
-    pub fn AssignIP(){
+    pub async fn AssignIP(&self,handle:&Handle,data:&Value)->Result<(),Box<dyn std::error::Error>>{
         
-    } 
+        handle
+        .address()
+        .add(
+            self.index?,
+            data["ip"].as_str().unwrap().parse::<Ipv4Addr>().unwrap().into(),
+            data["subnet"].as_u64().unwrap() as u8,
+        )
+        .execute()
+        .await?;
+
+        Ok(())
+    }
     
 }
 

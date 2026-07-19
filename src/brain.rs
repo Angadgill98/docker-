@@ -117,17 +117,21 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             let veth_pair=container::veth::VethPair{
                 veth_front:container::veth::VethEnd{
                     name:data["veth0_name"].as_str().unwrap().to_string(),
-                    insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string())
+                    insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string()),
+                    index:None
                 },
                 veth_back:container::veth::VethEnd{
                     name:data["veth1_name"].as_str().unwrap().to_string(),
-                    insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string())
+                    insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string()),
+                    index:None
                 }
             };
 
 
             veth_pair.Create(&handle).await?;
             
+            veth_pair.veth_back.index=Some(veth_pair.veth_back.GetIndex(&handle).await);
+            veth_pair.veth_front.index=Some(veth_pair.veth_front.GetIndex(&handle).await);
             veth_pair.CreateVethFile()?;
 
             let mut veth_file_map=veth_pair.ReadVethFile()?;    
@@ -142,11 +146,13 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             let veth_pair=container::veth::VethPair{
                 veth_front:container::veth::VethEnd{
                     name:data["veth0_name"].as_str().unwrap().to_string(),
-                    insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string())
+                    insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string()),
+                    index:None
                 },
                 veth_back:container::veth::VethEnd{
                     name:data["veth1_name"].as_str().unwrap().to_string(),
-                    insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string())
+                    insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string()),
+                    index:None
                 }
             };
 
@@ -247,7 +253,7 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
             let handle=Create_RT_Netlink().unwrap();
 
-            let name=data["name"].as_str().unwrap().to_string();
+            let container_name=data["name"].as_str().unwrap().to_string();
 
             let bridge_name=data["bridge_name"].as_str().unwrap().to_string();
             let BridgeMap=container::bridge::Bridge::ReadFile()?;
@@ -255,20 +261,22 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             let bridge=BridgeMap.get(&bridge_name).ok_or_else(||format!("no bridge found for name {}",bridge_name))?;
 
 
-            let veth_pair=container::veth::VethPair{
-                veth_front:container::veth::VethEnd{
-                    name:data["veth0_name"].as_str().unwrap().to_string(),
-                    insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string())
-                },
-                veth_back:container::veth::VethEnd{
-                    name:data["veth1_name"].as_str().unwrap().to_string(),
-                    insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string())
-                }
-            };
+            // let veth_pair=container::veth::VethPair{
+            //     veth_front:container::veth::VethEnd{
+            //         name:data["veth0_name"].as_str().unwrap().to_string(),
+            //         insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string())
+            //     },
+            //     veth_back:container::veth::VethEnd{
+            //         name:data["veth1_name"].as_str().unwrap().to_string(),
+            //         insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string())
+            //     }
+            // };
 
-            let veth12=veth_pair.ReadVethFile()?;
+            // let veth12=veth_pair.ReadVethFile()?;
 
-            let pair=veth12.get(format!("{}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name).as_str()).ok_or_else(||format!("no veth found for {}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name))?;
+            // let pair=veth12.get(format!("{}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name)
+            // .as_str())
+            // .ok_or_else(||format!("no veth found for {}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name))?;
 
             // let container=container::container{
             //     name:name.clone(),
