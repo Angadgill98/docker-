@@ -127,7 +127,8 @@ impl Net_ns {
         Ok(())
     }
 
-    pub fn GetNetFS(&self,pid:&i64)->Result<OwnedFd,Box<dyn std::error::Error>>{
+    pub fn GetNetFS(&self,pid:&i32)->Result<OwnedFd,Box<dyn std::error::Error>>{
+        println!("PID is {}",pid);
         let target=format!("/proc/{}/ns/net",pid);
         let file=File::open(target)?;
         let fd: OwnedFd = file.into();

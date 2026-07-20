@@ -1,1 +1,18 @@
-{}
+{
+  "vetht_veth2": {
+    "veth_front": {
+      "name": "vetht",
+      "insys": "dc-vetht",
+      "index": 8,
+      "ip": "10.0.1.6",
+      "subnet": 24
+    },
+    "veth_back": {
+      "name": "veth2",
+      "insys": "dc-veth2",
+      "index": 9,
+      "ip": "10.0.1.7",
+      "subnet": 24
+    }
+  }
+}

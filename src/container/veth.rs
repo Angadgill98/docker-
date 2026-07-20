@@ -186,7 +186,7 @@ impl VethPair {
         Ok(obj)
     }
 
-    pub fn WriteVethFile(&self,mut VethFileMap:HashMap<String,VethPair>)->Result<(),Box<dyn std::error::Error>>{
+    pub fn WriteVethFile(&self,mut VethFileMap:&HashMap<String,VethPair>)->Result<(),Box<dyn std::error::Error>>{
         
         fs::write("veth.json", serde_json::to_string_pretty(&VethFileMap)?)?;
         Ok(())
@@ -218,12 +218,14 @@ impl VethEnd{
     }
 
     pub async fn SetVethInNetns(&self,net_ns_fd:i32,handle:&Handle){
+
         handle
         .link()
         .set(self.GetIndex(handle).await)
         .setns_by_fd(net_ns_fd)
         .execute()
-        .await.expect("failed to move veth to the net ns");
+        .await
+        .expect("failed to move veth to the net ns");
     }
 
     

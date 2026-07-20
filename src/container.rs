@@ -44,13 +44,16 @@ pub struct container{
 
     pub mount_ns:Option<namespaces::mount::mount>,
     pub net_ns:Option<namespaces::net::Net_ns>,
-    pub pid_ns:Option<namespaces::pid::pid_ns>
+    pub pid_ns:Option<namespaces::pid::pid_ns>,
+
+
+    pub pid:Option<i32>
 }
 
 
 impl container{
     
-    pub async  fn Init(&self,handle:&Handle)->Result<(),Box<dyn std::error::Error>>{
+    pub async  fn Init(&self,handle:&Handle)->Result<i32,Box<dyn std::error::Error>>{
         let pid_flag=true;
         let mount_flag=true;
         let net_flag=true;
@@ -74,26 +77,29 @@ impl container{
 
         args.exit_signal=SIGCHLD as u64;
 
-        let child_pid =unsafe {
+        let ret =unsafe {
             syscall(SYS_clone3,&args as *const CloneArgs,mem::size_of::<CloneArgs>())
         };
 
+        let child_pid = ret as libc::pid_t;
+
         let parent_pid = unsafe { libc::getpid() };
-        self.veth.veth_back.SetVethInNetns(parent_pid, handle);
+        let parent_net_ns_fd=self.net_ns.as_ref().unwrap().GetNetFS(&parent_pid)?;
+        self.veth.veth_back.SetVethInNetns(parent_net_ns_fd.as_raw_fd(), handle).await;
 
         if child_pid == -1 {
             panic!("clone3 failed");
         } else if child_pid == 0 {
             // Child process
 
-            let net_fd=self.net_ns.as_ref().expect("msg").GetNetFS(&child_pid).unwrap();
-            self.veth.veth_front.SetVethInNetns(net_fd.as_raw_fd(), handle);
+            let net_fd=self.net_ns.as_ref().expect("msg").GetNetFS(&child_pid)?;
+            self.veth.veth_front.SetVethInNetns(net_fd.as_raw_fd(), handle).await;
 
             unsafe {
                 libc::setns(net_fd.as_raw_fd(), CLONE_NEWNET) ;
             }
 
-            self.AddNEtworkingRules(handle, self.veth.veth_front.ip.unwrap().clone(), self.veth.veth_front.GetIndex(handle).await);
+            self.AddNEtworkingRules(handle, self.veth.veth_front.ip.unwrap().clone(), self.veth.veth_front.GetIndex(handle).await).await?;
             loop {
                 unsafe {
                     libc::pause();
@@ -105,14 +111,20 @@ impl container{
         }
         
 
-        Ok(())
+        Ok(child_pid)
+    }
+
+    pub fn Kill(&self){
+        let ret = unsafe {
+            libc::kill(self.pid.unwrap(), libc::SIGTERM)
+        };
+
+        if ret == -1 {
+            eprintln!("Failed: {}", std::io::Error::last_os_error());
+        }
     }
 
     
-
-    fn ConnectBridge(){
-
-    }
 
     async fn AddNEtworkingRules(&self,handle:&Handle,addr:Ipv4Addr,veth_index:u32)->Result<(),Box<dyn std::error::Error>>{
         handle
@@ -162,7 +174,7 @@ impl container{
 
 
 
-    pub fn CreateConFile()->Result<(), Box<std::io::Error>>{
+    pub fn CreateConFile(&self)->Result<(), Box<std::io::Error>>{
         let mut file = match OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -182,16 +194,18 @@ impl container{
         Ok(())
     }
 
-    pub fn ReadConFile()->Result<HashMap<String,String>,Box<dyn std::error::Error>>{
+    pub fn ReadConFile()->Result<HashMap<String,Self>,Box<dyn std::error::Error>>{
         let json_str=fs::read_to_string("container.json")?;
-        let json:HashMap<String,String>=serde_json::from_str(json_str.as_str())?;
+        let json:HashMap<String,Self>=serde_json::from_str(json_str.as_str())?;
 
         Ok(json)
     }
 
-    pub fn WriteConFile(){
-
-    }
+    pub fn WriteConFile(&self,mut obj:HashMap<String,Self>)->Result<(),Box<dyn std::error::Error>>{
+    
+        fs::write("container.json", serde_json::to_string_pretty(&obj)?)?;
+        Ok(())
+    } 
 
 } 
     

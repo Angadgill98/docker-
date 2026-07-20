@@ -33,18 +33,21 @@ fn CLI_printer(){
     println!("");
 
     println!("3: Create a veth apair");
-    println!("4: Delete a veth");
+    println!("4: Assignip to veth");
+    println!("5: Delete a veth");
 
     println!("");
 
-    println!("5: Create net ns");
-    println!("6: Delete net ns");
+    println!("6: Create net ns");
+    println!("7: Delete net ns");
 
     println!("");
 
-    println!("5: Create mount ns");
-    println!("6: Delete mount ns");
+    println!("8: Create mount ns");
+    println!("9: Delete mount ns");
 
+    println!("10: Create a Contianer");
+    println!("11: Start a container");
 
 }
 
@@ -94,6 +97,14 @@ fn handleInput(input:&String,socket:&mut TcpStream){
         "9"=>{
             let op:u8= input.trim().parse().unwrap();
             DeleteMount_ns(socket, &op);
+        }
+        "10"=>{
+            let op:u8= input.trim().parse().unwrap();
+            CreateContainer(socket, &op);
+        }
+        "11"=>{
+            let op:u8= input.trim().parse().unwrap();
+            StartContainer(socket, &op);
         }
         _=>{
 
@@ -281,6 +292,8 @@ fn Assign_veth_ip(socket:&mut TcpStream,input :&u8){
     let veth1_ip=GetIP().to_string().trim().parse::<Ipv4Addr>().unwrap();
 
 
+    println!("Enter the subnet");
+    let subnet=GetSubnet();
 
     let op=input.clone();
 
@@ -289,6 +302,7 @@ fn Assign_veth_ip(socket:&mut TcpStream,input :&u8){
         "veth1_name":veth2.trim(),
         "veth1_ip":veth1_ip,
         "veth0_ip":veth0_ip,
+        "subnet":subnet
 
     });
 
@@ -447,7 +461,10 @@ fn CreateContainer(socket:&mut TcpStream,input:&u8){
 
     let data=json!({
         "name":name.trim(),
-        "image":image.trim()
+        "image":image.trim(),
+        "bridge_name":bridge_name.trim(),
+        "veth0_name":veth0.trim(),
+        "veth1_name":veth1.trim()
     });
 
     let op=input.clone();
@@ -462,23 +479,23 @@ fn CreateContainer(socket:&mut TcpStream,input:&u8){
 
 }
 
+fn StartContainer(socket:&mut TcpStream,input:&u8){
+    println!("Enter the name of the container");
+    let name=CLI_Input();
 
-fn Create_A_Container(input:&String){
-    let mut container_name:String=String::new();
-    println!("Enter contianer name: ");
-    std::io::stdin().read_line(&mut container_name).unwrap();
+    let data=json!({
+        "name":name.trim(),
+    });
 
+    let op=input.clone();
 
-    
+    let json =serde_json::to_string(&data).unwrap();
 
-    let env_vars=HandleENVpath();
-    let commands=HandleCommands();
-    let app_commands=HandleAppCommands();
+    let len=json.len();
 
-
-    
-    
-    
+    socket.write_all(&[op]);  
+    socket.write_all(&[len as u8]);
+    socket.write_all(json.as_bytes());
 }
 
 fn HandleENVpath()->Vec<String>{
