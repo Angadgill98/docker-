@@ -141,10 +141,11 @@
 //     Ok(())
 // }
 
-use std::{collections::HashMap, fs::{self, OpenOptions}, io::Write};
+use std::{collections::HashMap, ffi::CString, fs::{self, OpenOptions}, io::Write, net::Ipv4Addr};
 
 use futures::TryStreamExt;
 use rtnetlink::Handle;
+use serde_json::Value;
 
 use crate::interface;
 
@@ -179,7 +180,7 @@ impl VethPair {
         Ok(())
     }
 
-    pub fn ReadVethFile(&self)->Result<HashMap<String,VethPair>,Box<dyn std::error::Error>>{
+    pub fn ReadVethFile()->Result<HashMap<String,VethPair>,Box<dyn std::error::Error>>{
         let paylaod=fs::read_to_string("veth.json")?;
         let mut obj:HashMap<String,VethPair>=serde_json::from_str(&paylaod)?;
         Ok(obj)
@@ -199,7 +200,10 @@ pub struct VethEnd{
     pub name: String,
     pub insys: String,
 
-    pub index:Option<u32>
+    pub index:Option<u32>,
+
+    pub ip:Option<Ipv4Addr>,
+    pub subnet:Option<u8>
 }
 
 impl VethEnd{
@@ -222,14 +226,16 @@ impl VethEnd{
         .await.expect("failed to move veth to the net ns");
     }
 
-    pub async fn AssignIP(&self,handle:&Handle,data:&Value)->Result<(),Box<dyn std::error::Error>>{
+    
+
+    pub async fn AssignIP(&self,handle:&Handle,)->Result<(),Box<dyn std::error::Error>>{
         
         handle
         .address()
         .add(
-            self.index?,
-            data["ip"].as_str().unwrap().parse::<Ipv4Addr>().unwrap().into(),
-            data["subnet"].as_u64().unwrap() as u8,
+            self.index.ok_or("no value in the nidex og the veth pair")?,
+            self.ip.unwrap().into(),
+            self.subnet.unwrap(),
         )
         .execute()
         .await?;

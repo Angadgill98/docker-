@@ -3,7 +3,7 @@ use crate::namespaces;
 
 
 
-use std::{collections::HashMap, ffi::CString, fs::{self, File, OpenOptions}, io::Write, mem, os::fd::AsRawFd, path::Path};
+use std::{collections::HashMap, ffi::CString, fs::{self, File, OpenOptions}, io::Write, mem, os::fd::{AsRawFd, OwnedFd}, path::Path};
 
 
 use futures::TryStreamExt;
@@ -127,6 +127,13 @@ impl Net_ns {
         Ok(())
     }
 
+    pub fn GetNetFS(&self,pid:&i64)->Result<OwnedFd,Box<dyn std::error::Error>>{
+        let target=format!("/proc/{}/ns/net",pid);
+        let file=File::open(target)?;
+        let fd: OwnedFd = file.into();
+
+        Ok(fd)
+    }
     
 }
 

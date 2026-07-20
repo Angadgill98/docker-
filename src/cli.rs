@@ -73,21 +73,25 @@ fn handleInput(input:&String,socket:&mut TcpStream){
         }
         "4"=>{
             let op:u8= input.trim().parse().unwrap(); 
-            delete_veth(socket, &op);
+            Assign_veth_ip(socket, &op);    
         }
         "5"=>{
-            let op:u8= input.trim().parse().unwrap();
-            CreateNet_ns(socket, &op);
+            let op:u8= input.trim().parse().unwrap(); 
+            delete_veth(socket, &op);
         }
         "6"=>{
             let op:u8= input.trim().parse().unwrap();
-            DeleteNet_ns(socket, &op);
+            CreateNet_ns(socket, &op);
         }
         "7"=>{
             let op:u8= input.trim().parse().unwrap();
-            CreateMount_ns(socket, &op);
+            DeleteNet_ns(socket, &op);
         }
         "8"=>{
+            let op:u8= input.trim().parse().unwrap();
+            CreateMount_ns(socket, &op);
+        }
+        "9"=>{
             let op:u8= input.trim().parse().unwrap();
             DeleteMount_ns(socket, &op);
         }
@@ -257,7 +261,44 @@ fn delete_veth(socket:&mut TcpStream,input:&u8){
     
 }
 
+fn Assign_veth_ip(socket:&mut TcpStream,input :&u8){
+    println!("Enter veth name 1:");
+    let veth1=CLI_Input();
 
+
+
+    println!("Enter veth name 2:");
+    let veth2=CLI_Input();
+
+
+    
+    println!("Enter ip of the veth0");
+    let veth0_ip=GetIP().to_string().trim().parse::<Ipv4Addr>().unwrap();
+
+   
+
+    println!("Enter ip of the veth1");
+    let veth1_ip=GetIP().to_string().trim().parse::<Ipv4Addr>().unwrap();
+
+
+
+    let op=input.clone();
+
+    let data=json!({
+        "veth0_name":veth1.trim(),
+        "veth1_name":veth2.trim(),
+        "veth1_ip":veth1_ip,
+        "veth0_ip":veth0_ip,
+
+    });
+
+    let json = serde_json::to_string(&data).unwrap();
+    let len=json.len();
+
+    socket.write_all(&[op]);  
+    socket.write_all(&[len as u8]);
+    socket.write_all(json.as_bytes()); 
+}
 
 fn CreateNet_ns(socket:&mut TcpStream,input:&u8){
     println!("Enter the name of net ns");

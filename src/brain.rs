@@ -1,4 +1,4 @@
-use std::{fmt::format, fs, io::Read};
+use std::{fmt::format, fs, io::Read, net::Ipv4Addr};
 
 use futures::{TryStreamExt, future::ok, sink::Buffer};
 use rtnetlink::Handle;
@@ -114,16 +114,20 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
             let handle=Create_RT_Netlink().unwrap();
 
-            let veth_pair=container::veth::VethPair{
+            let mut veth_pair=container::veth::VethPair{
                 veth_front:container::veth::VethEnd{
                     name:data["veth0_name"].as_str().unwrap().to_string(),
                     insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string()),
-                    index:None
+                    index:None,
+                    ip:None,
+                    subnet:None
                 },
                 veth_back:container::veth::VethEnd{
                     name:data["veth1_name"].as_str().unwrap().to_string(),
                     insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string()),
-                    index:None
+                    index:None,
+                    ip:None,
+                    subnet:None
                 }
             };
 
@@ -134,12 +138,50 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             veth_pair.veth_front.index=Some(veth_pair.veth_front.GetIndex(&handle).await);
             veth_pair.CreateVethFile()?;
 
-            let mut veth_file_map=veth_pair.ReadVethFile()?;    
+            let mut veth_file_map=container::veth::VethPair::ReadVethFile()?;    
             veth_file_map.insert(format!("{}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name), veth_pair.clone());        
             veth_pair.WriteVethFile(veth_file_map)?;
 
         }
-        4=>{//Delete a veth
+        4=>{//assign ip to veth 
+            
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while assigning the ip to the veth pair");
+            let handle=Create_RT_Netlink().unwrap();
+
+            let mut veth_pair=container::veth::VethPair{
+                veth_front:container::veth::VethEnd{
+                    name:data["veth0_name"].as_str().unwrap().to_string(),
+                    insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string()),
+                    index:None,
+                    ip:Some(data["veth0_ip"].as_str().unwrap().parse::<Ipv4Addr>()?),
+                    subnet:Some(data["subnet"].as_u64().unwrap() as u8)},
+                veth_back:container::veth::VethEnd{
+                    name:data["veth1_name"].as_str().unwrap().to_string(),
+                    insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string()),
+                    index:None,
+                    ip:Some(data["veth1_ip"].as_str().unwrap().parse::<Ipv4Addr>()?),
+                    subnet:Some(data["subnet"].as_u64().unwrap() as u8)}
+                };
+
+            
+
+            veth_pair.veth_back.AssignIP(&handle).await?;
+            veth_pair.veth_front.AssignIP(&handle).await?;
+
+
+            veth_pair.CreateVethFile()?;
+            let mut veths=container::veth::VethPair::ReadVethFile()?;
+            if let Some(veth)=veths.get_mut(&format!("{}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name)){
+                veth.veth_back.ip=veth_pair.veth_back.ip;
+                veth.veth_back.subnet=veth_pair.veth_back.subnet;
+
+                veth.veth_front.ip=veth_pair.veth_front.ip;
+                veth.veth_front.subnet=veth_pair.veth_front.subnet;
+            }  
+            veth_pair.WriteVethFile(veths)?;      
+
+        }
+        5=>{//Delete a veth
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while deleting veth pair");
             let handle=Create_RT_Netlink().unwrap();
 
@@ -147,12 +189,16 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
                 veth_front:container::veth::VethEnd{
                     name:data["veth0_name"].as_str().unwrap().to_string(),
                     insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string()),
-                    index:None
+                    index:None,
+                    ip:None,
+                    subnet:None
                 },
                 veth_back:container::veth::VethEnd{
                     name:data["veth1_name"].as_str().unwrap().to_string(),
                     insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string()),
-                    index:None
+                    index:None,
+                    ip:None,
+                    subnet:None
                 }
             };
 
@@ -162,14 +208,14 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             
             veth_pair.CreateVethFile()?;
 
-            let mut veth_file_map=veth_pair.ReadVethFile()?;            
+            let mut veth_file_map=container::veth::VethPair::ReadVethFile()?;            
             veth_file_map.remove(format!("{}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name).trim());
             veth_pair.WriteVethFile(veth_file_map)?;            
 
             
 
         }   
-        5=>{//Create net ns 
+        6=>{//Create net ns 
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating net ns");
             let handle=Create_RT_Netlink().unwrap();
 
@@ -189,7 +235,7 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
 
             
         }
-        6=>{//Delete net ns
+        7=>{//Delete net ns
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
             let handle=Create_RT_Netlink().unwrap();
 
@@ -208,7 +254,7 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
 
 
         }
-        7=>{//Create mount ns
+        8=>{//Create mount ns
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
             let handle=Create_RT_Netlink().unwrap();
 
@@ -231,7 +277,7 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
             mount.WriteToFile(ns)?;
 
         }
-        8=>{//Delete mount ns 
+        9=>{//Delete mount ns 
             let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while creating veth pair");
             let handle=Create_RT_Netlink().unwrap();
 
@@ -260,37 +306,42 @@ async fn handle_client(msg:&Vec<u8>,op:u8)->Result<(),Box<dyn std::error::Error>
 
             let bridge=BridgeMap.get(&bridge_name).ok_or_else(||format!("no bridge found for name {}",bridge_name))?;
 
+            let veth0_name=data["veth0_name"].as_str().unwrap().to_string();
+            let veth1_name=data["veth0_name"].as_str().unwrap().to_string();
 
-            // let veth_pair=container::veth::VethPair{
-            //     veth_front:container::veth::VethEnd{
-            //         name:data["veth0_name"].as_str().unwrap().to_string(),
-            //         insys:format!("dc-{}",data["veth0_name"].as_str().unwrap().to_string())
-            //     },
-            //     veth_back:container::veth::VethEnd{
-            //         name:data["veth1_name"].as_str().unwrap().to_string(),
-            //         insys:format!("dc-{}",data["veth1_name"].as_str().unwrap().to_string())
-            //     }
-            // };
+            let vethmap=container::veth::VethPair::ReadVethFile()?;
+            let veth_pair=vethmap.get(&format!("{}_{}",veth0_name,veth1_name)).ok_or("no veth pair found")?;
 
-            // let veth12=veth_pair.ReadVethFile()?;
+            let container=container::container{
+                name:container_name,
+                bridge:bridge.clone(),
+                veth:veth_pair.to_owned(),
+                mount_ns:None,
+                net_ns:None,
+                pid_ns:None
+            };
 
-            // let pair=veth12.get(format!("{}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name)
-            // .as_str())
-            // .ok_or_else(||format!("no veth found for {}_{}",veth_pair.veth_front.name,veth_pair.veth_back.name))?;
+            container.CreateInitFile()?;
 
-            // let container=container::container{
-            //     name:name.clone(),
-            //     bridge:bridge.clone(),
-            //     veth:pair.clone(),
+            let mut init_map=container::container::ReadInitFile()?;
+            init_map.insert(container.name.clone(), container.clone());
+            container.WriteToFile(init_map);
+        }
+        11=>{//Start a container
+            let data:Value=serde_json::from_slice(msg).expect("failed to get jsonobj while starting a container");
+            let handle=Create_RT_Netlink().unwrap();
 
-            //     mount_ns:namespaces::mount::mount{},
-            //     net_ns:namespaces::net::Net_ns{
-            //         name:"".to_string()
-            //     },
-            //     pid_ns:namespaces::pid::pid_ns{}
-            // };
 
-            // container.Init();
+            let container_name=data["name"].to_string();
+
+            let mut init_map=container::container::ReadInitFile()?;
+
+            if let Some(con)=init_map.get_mut(&container_name){
+                con.Init(&handle);
+            }else{
+                println!("no contianer found for {}",container_name);
+            }
+
         }
         _=>{
             println!("kn hua");

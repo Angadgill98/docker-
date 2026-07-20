@@ -4,7 +4,10 @@ use crate::{interface, namespaces};
 
 
 
+use serde::{Serialize, Deserialize};
 
+
+#[derive(Clone,Serialize,Deserialize)]
 pub struct pid_ns{
 
 }
