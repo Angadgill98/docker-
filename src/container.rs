@@ -77,29 +77,40 @@ impl container{
 
         args.exit_signal=SIGCHLD as u64;
 
+        let parent_pid = unsafe { libc::getpid() };
+        let parent_net_ns_fd=self.net_ns.as_ref().unwrap().GetNetFD(&parent_pid)?;
+        self.veth.veth_back.SetVethInNetns(parent_net_ns_fd.as_raw_fd(), handle).await;
+
         let ret =unsafe {
             syscall(SYS_clone3,&args as *const CloneArgs,mem::size_of::<CloneArgs>())
         };
 
         let child_pid = ret as libc::pid_t;
 
-        let parent_pid = unsafe { libc::getpid() };
-        let parent_net_ns_fd=self.net_ns.as_ref().unwrap().GetNetFS(&parent_pid)?;
-        self.veth.veth_back.SetVethInNetns(parent_net_ns_fd.as_raw_fd(), handle).await;
+        
 
         if child_pid == -1 {
             panic!("clone3 failed");
         } else if child_pid == 0 {
             // Child process
 
-            let net_fd=self.net_ns.as_ref().expect("msg").GetNetFS(&child_pid)?;
-            self.veth.veth_front.SetVethInNetns(net_fd.as_raw_fd(), handle).await;
-
+            //dont delete kill singal woks  wiht code and ntoing else
             unsafe {
-                libc::setns(net_fd.as_raw_fd(), CLONE_NEWNET) ;
+                let mut sa: libc::sigaction = std::mem::zeroed();
+
+                sa.sa_sigaction =KillSignalHnadler as usize;
+                sa.sa_flags = 0;
+
+                libc::sigemptyset(&mut sa.sa_mask);
+
+                if libc::sigaction(libc::SIGTERM, &sa, std::ptr::null_mut()) != 0 {
+                    panic!("sigaction failed");
+                }
             }
+            
 
             self.AddNEtworkingRules(handle, self.veth.veth_front.ip.unwrap().clone(), self.veth.veth_front.GetIndex(handle).await).await?;
+            self.EnableLoopInterface(handle).await?;
             loop {
                 unsafe {
                     libc::pause();
@@ -107,12 +118,20 @@ impl container{
             }
         } else {
             // Parent process
+
+
+
+            let net_fd=self.net_ns.as_ref().expect("msg").GetNetFD(&child_pid)?;
+            self.veth.veth_front.SetVethInNetns(net_fd.as_raw_fd(), handle).await;
             println!("Child PID = {}", child_pid);
+            
         }
         
 
         Ok(child_pid)
     }
+
+    
 
     pub fn Kill(&self){
         let ret = unsafe {
@@ -120,8 +139,11 @@ impl container{
         };
 
         if ret == -1 {
-            eprintln!("Failed: {}", std::io::Error::last_os_error());
+
+            println!("Failed: {}", std::io::Error::last_os_error());
         }
+
+        println!("Killed the process {}",self.pid.unwrap())
     }
 
     
@@ -138,6 +160,17 @@ impl container{
 
         Ok(())
     }   
+
+    async fn EnableLoopInterface(&self,handle:&Handle)->Result<(),Box<dyn std::error::Error>>{
+        handle
+        .link()
+        .set(1) // index of lo in that namespace
+        .up()
+        .execute()
+        .await?;
+
+    Ok(())
+    }
 
     pub fn CreateInitFile(&self)->Result<(), Box<std::io::Error>>{
         let mut file = match OpenOptions::new()
@@ -209,3 +242,15 @@ impl container{
 
 } 
     
+
+
+
+
+pub extern "C" fn KillSignalHnadler(_: i32) {
+        
+       unsafe {
+        let msg = b"handler called\n";
+        libc::write(1, msg.as_ptr() as *const _, msg.len());
+        libc::_exit(0);
+    }
+}

@@ -48,6 +48,7 @@ fn CLI_printer(){
 
     println!("10: Create a Contianer");
     println!("11: Start a container");
+    println!("12: Stop a container")
 
 }
 
@@ -105,6 +106,10 @@ fn handleInput(input:&String,socket:&mut TcpStream){
         "11"=>{
             let op:u8= input.trim().parse().unwrap();
             StartContainer(socket, &op);
+        }
+        "12"=>{
+            let op:u8= input.trim().parse().unwrap();
+            StopContainer(socket, &op);
         }
         _=>{
 
@@ -497,6 +502,26 @@ fn StartContainer(socket:&mut TcpStream,input:&u8){
     socket.write_all(&[len as u8]);
     socket.write_all(json.as_bytes());
 }
+
+fn StopContainer(socket:&mut TcpStream,input:&u8){
+    println!("Enter the name of the container");
+    let name=CLI_Input();
+
+    let data=json!({
+        "name":name.trim(),
+    });
+
+    let op=input.clone();
+
+    let json =serde_json::to_string(&data).unwrap();
+
+    let len=json.len();
+
+    socket.write_all(&[op]);  
+    socket.write_all(&[len as u8]);
+    socket.write_all(json.as_bytes());
+}
+
 
 fn HandleENVpath()->Vec<String>{
     let mut env_path:String=String::new();
